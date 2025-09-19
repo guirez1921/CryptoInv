@@ -70,10 +70,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
-    Route::post('/chat', [ChatController::class, 'store'])->name('chat.store');
-    Route::patch('/chat/{chat}/read', [ChatController::class, 'markAsRead'])->name('chat.read');
-    Route::get('/chat/conversation/{userId}', [ChatController::class, 'getConversation'])->name('chat.conversation');
 });
 
 require __DIR__ . '/auth.php';
