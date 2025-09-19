@@ -49,8 +49,8 @@ class AdminController extends Controller
 
         // Calculate dashboard statistics
         $stats = [
-            'totalUsers' => User::count(),
-            'activeUsers' => User::where('is_active', true)->count(),
+            'totalUsers' => $users->count(),
+            'activeUsers' => $users->count(),
             'totalBalance' => Account::sum('total_balance'),
             'pendingWithdrawals' => BlockchainTransaction::where('type', 'withdrawal')
                 ->where('status', 'pending')
