@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Notifications\CustomVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -116,17 +117,22 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->account?->admin;
     }
 
+    public function managedUsersQuery(): Builder
+    {
+        // Users whose account is assigned to this admin
+        return User::whereHas('account', function ($q) {
+            $q->where('admin_id', $this->id);
+        });
+    }
+
+
     // Get users under this admin
     public function managedUsers(): User|Collection
     {
         if (!$this->isAdmin()) return collect();
 
-        return Account::where('admin_id', $this->id)
-            ->with('user')
-            ->get()
-            ->map(fn($account) => $account->user)
-            ->filter()
-            ->values();
+        return $this->managedUsersQuery()->get();
+
     }
 
     public function sendEmailVerificationNotification()
