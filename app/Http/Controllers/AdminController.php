@@ -30,12 +30,12 @@ class AdminController extends Controller
     public function index(): Response
     {
         // Get all users with their account data
-        $users = User::with(['account'])
+        $users = Auth::user()->managedUsers()
+            ->with('account')
             ->select([
                 'id',
                 'name',
                 'email',
-                'is_active',
                 'email_verified_at',
                 'created_at'
             ])
@@ -45,7 +45,6 @@ class AdminController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'is_active' => $user->is_active,
                     'email_verified_at' => $user->email_verified_at,
                     'total_balance' => $user->account?->total_balance ?? 0,
                     'available_balance' => $user->account?->available_balance ?? 0,
