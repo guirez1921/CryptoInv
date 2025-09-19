@@ -225,12 +225,12 @@ const Dashboard = ({
                       View Portfolio
                     </Button>
                   </Link>
-                  <Link href={route('chat.index')}>
+                  {/* <Link href={route('chat.index')}>
                     <Button className="justify-start w-full" variant="outline">
                       <Calculator className="w-4 h-4 mr-2" />
                       AI Assistant
                     </Button>
-                  </Link>
+                  </Link> */}
                 </div>
               </Card>
 
