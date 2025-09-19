@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users');
             $table->foreignId('asset_id')->nullable()->constrained('assets');
-            $table->enum('strategy', ['aggressive', 'high', 'medium', 'low']);
+            $table->enum('strategy', ['aggressive', 'balanced', 'conservative']);
             $table->decimal('amount', 36, 18);
             $table->decimal('entry_price', 20, 8);
             $table->decimal('exit_price', 20, 8)->nullable();

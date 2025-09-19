@@ -19,4 +19,9 @@ class Notification extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function unread(): \Illuminate\Database\Eloquent\Builder
+    {
+        return $this->where('is_read', false);
+    }
 }

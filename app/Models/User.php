@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -57,7 +58,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(Account::class);
     }
-    
+
     public function deposits(): HasMany
     {
         return $this->hasMany(Deposit::class);
@@ -119,7 +120,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function managedUsers(): User|Collection
     {
         if (!$this->isAdmin()) return collect();
-        
+
         return Account::where('admin_id', $this->id)
             ->with('user')
             ->get()
@@ -129,5 +130,50 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sendEmailVerificationNotification()
     {
         $this->notify(new CustomVerifyEmail);
+    }
+
+    public function paymentHistoryQuery()
+    {
+        // Get closed trades (profit/loss)
+        $trades = $this->trades()
+            ->where('status', 'closed')
+            ->selectRaw('
+                id as reference_id,
+                CASE WHEN profit_loss >= 0 THEN "profit" ELSE "loss" END as type,
+                profit_loss as amount,
+                COALESCE(closed_at, updated_at) as date,
+                "trade" as source
+            ');
+
+        // Get deposits
+        $deposits = $this->deposits()
+            ->selectRaw('
+                id as reference_id,
+                "deposit" as type,
+                amount,
+                created_at as date,
+                "deposit" as source
+            ');
+
+        // Get withdrawals
+        $withdrawals = $this->withdrawals()
+            ->selectRaw('
+                id as reference_id,
+                "withdrawal" as type,
+                amount,
+                created_at as date,
+                "withdrawal" as source
+            ');
+
+        // Union all queries
+        $query = $trades->unionAll($deposits)->unionAll($withdrawals);
+
+        // Return as a query builder so you can paginate
+        return DB::query()->fromSub($query, 'payment_history')->orderByDesc('date');
+    }
+
+    public function loginActivities()
+    {
+        return $this->hasMany(UserSession::class)->with(['device']);
     }
 }

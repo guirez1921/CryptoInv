@@ -54,7 +54,7 @@ Route::middleware('auth')->group(function () {
         ->name('verification.send');
 
     Route::get('/profile', [ProfileController::class, 'show'])
-        ->name('profile.edit');
+        ->name('profile.show');
 
     Route::post('/profile/update', [ProfileController::class, 'show'])->name('profile.update');
 });

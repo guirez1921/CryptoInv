@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users');
             $table->foreignId('asset_id')->constrained('assets');
+            $table->foreignId('hd_wallet_id')->nullable()->constrained()->onDelete('set null');
+            $table->string('chain')->default('ethereum');
             $table->foreignId('blockchain_transaction_id')->nullable()->constrained('blockchain_transactions');
             $table->string('withdrawal_address')->index();
             $table->decimal('amount', 36, 18);
@@ -33,6 +35,8 @@ return new class extends Migration
             $table->text('rejection_reason')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
+
+            $table->index(['hd_wallet_id', 'status']);
         });
     }
 

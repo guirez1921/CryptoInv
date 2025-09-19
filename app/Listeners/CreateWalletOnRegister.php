@@ -35,7 +35,9 @@ class CreateWalletOnRegister
 
         try {
             // Call Node.js API to generate wallet
-            $response = Http::post("http://127.0.0.1:4000/wallet/new/{$account->id}");
+            $response = Http::withHeaders([
+                'x-api-key' => env('API_KEY'),
+            ])->post("http://127.0.0.1:4000/api/wallet/new/{$account->id}");
 
             if ($response->successful()) {
                 $walletData = $response->json();

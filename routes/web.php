@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Controllers\AssetController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -12,6 +16,50 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
+    // Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
+    Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+    Route::get('/payments/deposit', [PaymentController::class, 'depositPage'])->name('payments.depositPage');
+    Route::get('/payments/withdraw', [PaymentController::class, 'withdrawalPage'])->name('payments.withdrawalPage');
+    Route::get('/payments/history', [PaymentController::class, 'updateHistory'])->name('payments.history');
+    Route::get('/payments/deposit', [PaymentController::class, 'depositPage'])->name('deposits.index');
+    Route::get('/payments/withdraw', [PaymentController::class, 'withdrawPage'])->name('withdrawals.index');
+    Route::post('/payments/deposit', [PaymentController::class, 'deposit'])->name('payments.deposit');
+    Route::post('/payments/withdraw', [PaymentController::class, 'withdraw'])->name('payments.withdraw');
+    Route::prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', [NotificationController::class, 'index'])->name('index');
+        Route::patch('/{id}/read', [NotificationController::class, 'markAsRead'])->name('read');
+        Route::patch('/read-all', [NotificationController::class, 'markAllAsRead'])->name('read-all');
+        Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('destroy');
+        Route::delete('/', [NotificationController::class, 'destroyAll'])->name('destroy-all');
+        Route::get('/unread-count', [NotificationController::class, 'getUnreadCount'])->name('unread-count');
+    });
+
+    // 🟢 User Chat Routes
+    Route::prefix('chat')->name('chat.')->group(function () {
+        Route::get('history', [ChatController::class, 'getChatHistory'])->name('history');
+        Route::post('send', [ChatController::class, 'sendUserMsg'])->name('send');
+        Route::post('read', [ChatController::class, 'markAsRead'])->name('read');
+        Route::get('unread-count', [ChatController::class, 'getUnreadCount'])->name('unread_count');
+    });
+
+    // 🟢 Admin Chat Routes
+    Route::prefix('admin/chat')->name('admin.chat.')->group(function () {
+        Route::get('{user}/history', [ChatController::class, 'adminChatHistory'])->name('history');
+        Route::post('{user}/send', [ChatController::class, 'sendAdminMsg'])->name('send');
+    });
+
+    // Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.index');
+    Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::get('/assets/{asset}/edit', [AssetController::class, 'edit'])->name('assets.edit');
+    Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
+    Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+
+    // Profile routes
+    // Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
     Route::post('/chat', [ChatController::class, 'store'])->name('chat.store');
@@ -19,4 +67,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/chat/conversation/{userId}', [ChatController::class, 'getConversation'])->name('chat.conversation');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

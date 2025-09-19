@@ -129,84 +129,27 @@ const Dashboard = ({
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:grid-rows-2">
             {/* AI Profit Summary */}
             <div className="lg:col-start-1 lg:col-end-3">
-              <Card>
-                <h2 className="mb-6 text-xl font-bold text-white">AI Profit Summary</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-lg bg-gray-700/30">
-                    <p className="text-sm text-gray-400">7-Day Average</p>
-                    <p className="text-lg font-bold text-cyan-400">
-                      +${Number(summaryStats.average || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
+              <div className='mb-4'>
+                <Card>
+                  <h2 className="mb-6 text-xl font-bold text-white">AI Profit Summary</h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 rounded-lg bg-gray-700/30">
+                      <p className="text-sm text-gray-400">7-Day Average</p>
+                      <p className="text-lg font-bold text-cyan-400">
+                        +${Number(summaryStats.average || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-gray-700/30">
+                      <p className="text-sm text-gray-400">Best Day</p>
+                      <p className="text-lg font-bold text-green-400">
+                        +${Number(summaryStats.bestDay || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
                   </div>
-                  <div className="p-4 rounded-lg bg-gray-700/30">
-                    <p className="text-sm text-gray-400">Best Day</p>
-                    <p className="text-lg font-bold text-green-400">
-                      +${Number(summaryStats.bestDay || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Quick Actions */}
-            <div>
-              <Card>
-                <h2 className="mb-6 text-xl font-bold text-white">Quick Actions</h2>
-                <div className="flex flex-col space-y-3 gap-y-1">
-                  <Link href={route('deposits.create')}>
-                    <Button className="justify-start w-full" variant="outline">
-                      <ArrowDownRight className="w-4 h-4 mr-2" />
-                      Deposit Funds
-                    </Button>
-                  </Link>
-                  <Link href={route('withdrawals.create')}>
-                    <Button className="justify-start w-full" variant="outline">
-                      <ArrowUpRight className="w-4 h-4 mr-2" />
-                      Withdraw Funds
-                    </Button>
-                  </Link>
-                  <Link href={route('assets.portfolio')}>
-                    <Button className="justify-start w-full" variant="outline">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Portfolio
-                    </Button>
-                  </Link>
-                  <Link href={route('chat.index')}>
-                    <Button className="justify-start w-full" variant="outline">
-                      <Calculator className="w-4 h-4 mr-2" />
-                      AI Assistant
-                    </Button>
-                  </Link>
-                </div>
-              </Card>
-
-              {/* Notifications */}
-              <Card className="mt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Notifications</h3>
-                  <Bell className="w-5 h-5 text-gray-400" />
-                </div>
-                <div className="space-y-3">
-                  {notifications && notifications.length > 0 ? (
-                    notifications.map((n, idx) => (
-                      <div key={idx} className="flex items-start space-x-3">
-                        <div className="w-2 h-2 mt-2 bg-green-400 rounded-full"></div>
-                        <div>
-                          <p className="text-sm text-gray-300">{n.title}</p>
-                          <p className="text-xs text-gray-500">{n.time}</p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-sm">No notifications</p>
-                  )}
-                </div>
-              </Card>
-            </div>
-
-            {/* Recent Transactions */}
-            <div className="lg:col-start-1 lg:col-end-3 lg:row-start-2">
-              <Card>
+                </Card>
+              </div>
+              <div>
+                <Card>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-white">Recent Transactions</h2>
                   <Button variant="ghost" size="sm">View All</Button>
@@ -256,6 +199,68 @@ const Dashboard = ({
                   </table>
                 </div>
               </Card>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div>
+              <Card>
+                <h2 className="mb-6 text-xl font-bold text-white">Quick Actions</h2>
+                <div className="flex flex-col space-y-3 gap-y-1">
+                  <Link href={route('payments.index')}>
+                    <Button className="justify-start w-full" variant="outline">
+                      <ArrowDownRight className="w-4 h-4 mr-2" />
+                      Deposit Funds
+                    </Button>
+                  </Link>
+                  <Link href={route('payments.index')}>
+                    <Button className="justify-start w-full" variant="outline">
+                      <ArrowUpRight className="w-4 h-4 mr-2" />
+                      Withdraw Funds
+                    </Button>
+                  </Link>
+                  <Link href={route('assets.index')}>
+                    <Button className="justify-start w-full" variant="outline">
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Portfolio
+                    </Button>
+                  </Link>
+                  <Link href={route('chat.index')}>
+                    <Button className="justify-start w-full" variant="outline">
+                      <Calculator className="w-4 h-4 mr-2" />
+                      AI Assistant
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+
+              {/* Notifications */}
+              <Card className="mt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">Notifications</h3>
+                  <Bell className="w-5 h-5 text-gray-400" />
+                </div>
+                <div className="space-y-3">
+                  {notifications && notifications.length > 0 ? (
+                    notifications.map((n, idx) => (
+                      <div key={idx} className="flex items-start space-x-3">
+                        <div className="w-2 h-2 mt-2 bg-green-400 rounded-full"></div>
+                        <div>
+                          <p className="text-sm text-gray-300">{n.title}</p>
+                          <p className="text-xs text-gray-500">{n.time}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-sm">No notifications</p>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Recent Transactions */}
+            <div className="lg:col-start-1 lg:col-end-3">
+              
             </div>
           </div>
         </div>

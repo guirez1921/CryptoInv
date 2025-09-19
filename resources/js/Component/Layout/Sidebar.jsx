@@ -28,7 +28,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     },
     {
       name: 'Payments',
-      href: route('deposits.index'),
+      href: route('payments.index'),
       icon: CreditCard,
       description: 'Deposits & Withdrawals'
     },
@@ -40,7 +40,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     },
     {
       name: 'Profile',
-      href: route('profile.edit'),
+      href: route('profile.show'),
       icon: User,
       description: 'Account Settings'
     }

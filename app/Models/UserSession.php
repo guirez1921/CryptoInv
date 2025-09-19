@@ -8,7 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class UserSession extends Model
 {
     protected $fillable = [
-        'user_id', 'device_id', 'session_id', 'last_activity',
+        'user_id',
+        'device_id',
+        'session_id',
+        'last_activity',
     ];
 
     protected $casts = [
@@ -23,5 +26,10 @@ class UserSession extends Model
     public function device(): BelongsTo
     {
         return $this->belongsTo(UserDevice::class);
+    }
+
+    public function session()
+    {
+        return $this->belongsTo(Session::class, 'session_id', 'id');
     }
 }

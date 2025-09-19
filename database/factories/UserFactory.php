@@ -24,10 +24,10 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name'              => $this->faker->name(),
-            'email'             => $this->faker->unique()->safeEmail(),
+            'name'              => 'admin',
+            'email'             => 'admin@cryptoinv.com',
             'email_verified_at' => now(),
-            'password'          => bcrypt('password'), // 🔑 default
+            'password'          => bcrypt('admin123'), // 🔑 default
             'is_admin'          => false,
             'status'            => 'active',
             'last_login_at'     => null,

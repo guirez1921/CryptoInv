@@ -24,7 +24,7 @@ class ProfileController extends Controller
             $query->latest()->limit(5);
         }]);
 
-        return Inertia::render('Profile/Show', [
+        return Inertia::render('Profile/Index', [
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -38,24 +38,39 @@ class ProfileController extends Controller
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
             ],
-            'wallets' => $user->account()->wallets()->map(function ($wallet) {
+            'wallets' => $user->account->wallets()->with('addresses')->get()->map(function ($hdWallet) {
                 return [
-                    'id' => $wallet->id,
-                    'type' => $wallet->type,
-                    'address' => $wallet->address,
-                    'balance' => $wallet->balance,
-                    'is_active' => $wallet->is_active,
-                    'created_at' => $wallet->created_at,
+                    'id' => $hdWallet->id,
+                    'type' => $hdWallet->type,
+                    'chain' => $hdWallet->chain,
+                    'is_active' => $hdWallet->is_active,
+                    'created_at' => $hdWallet->created_at,
+                    'addresses' => $hdWallet->addresses->map(function ($address) {
+                        return [
+                            'id' => $address->id,
+                            'address' => $address->address,
+                            'balance' => $address->balance,
+                            'is_used' => $address->is_used,
+                            'created_at' => $address->created_at,
+                        ];
+                    }),
                 ];
             }),
-            'loginActivities' => $user->loginActivities->map(function ($activity) {
+            'loginActivities' => $user->loginActivities->map(function ($session) {
                 return [
-                    'id' => $activity->id,
-                    'ip_address' => $activity->ip_address,
-                    'user_agent' => $activity->user_agent,
-                    'location' => $activity->location,
-                    'is_current' => $activity->is_current,
-                    'created_at' => $activity->created_at,
+                    'id' => $session->id,
+                    'ip_address' => optional($session->session)->ip_address,
+                    'user_agent' => optional($session->session)->user_agent,
+                    'location' => $session->location ?? 'Unknown',
+                    'is_current' => session()->getId() === $session->session_id,
+                    'device' => [
+                        'id' => $session->device?->id,
+                        'type' => $session->device?->type,
+                        'name' => $session->device?->name,
+                    ],
+                    'last_activity' => $session->last_activity,
+                    'created_at' => $session->created_at,
+
                 ];
             }),
             'notifications' => [
@@ -180,7 +195,6 @@ class ProfileController extends Controller
     }
 
     /**
-     * Disconnect a wallet.
      */
     public function disconnectWallet(Request $request, $walletId): RedirectResponse
     {

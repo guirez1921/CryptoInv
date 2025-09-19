@@ -26,6 +26,7 @@ return new class extends Migration
             $table->timestamp('last_activity_at')->nullable();
             $table->enum('account_type', ['standard', 'premium', 'vip'])->default('standard');
             $table->boolean('is_active')->default(true);
+            $table->decimal('crypto_balance', 36, 18)->default(0);
             $table->timestamps();
         });
     }

@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Head, usePage } from '@inertiajs/react';
 import AuthenticatedHeader from '@/component/Layout/AuthenticatedHeader';
 import Sidebar from '@/component/Layout/Sidebar';
+import FloatingChat from '@/Component/Layout/Chat';
 
 export default function CryptoAIAuthLayout({ children, title = 'CryptoAI Dashboard' }) {
     const { auth } = usePage().props;
     const user = auth?.user;
-    const userBalance = auth?.balance;
+    const userBalance = user?.account?.balance || 0;
     const notificationCount = auth?.notificationCount || 0;
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -40,6 +41,7 @@ export default function CryptoAIAuthLayout({ children, title = 'CryptoAI Dashboa
                         <div className="h-full overflow-y-auto">
                             {children}
                         </div>
+                        <FloatingChat auth={auth} />
                     </main>
                 </div>
             </div>

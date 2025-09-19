@@ -8,8 +8,6 @@ export default function Login({ status, canResetPassword }) {
     const [showPassword, setShowPassword] = useState(false);
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
-        phone: '',
-        telegram: '',
         password: '',
         remember: false,
     });
@@ -29,7 +27,7 @@ export default function Login({ status, canResetPassword }) {
     return (
         <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-900 sm:px-6 lg:px-8">
             <Head title="Log in" />
-            
+
             <div className="w-full max-w-md">
                 <div className="mb-8 text-center">
                     <div className="flex items-center justify-center mb-6 space-x-2">
@@ -51,7 +49,7 @@ export default function Login({ status, canResetPassword }) {
                 <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl shadow-xl p-8 border border-gray-700/50">
                     <form onSubmit={submit} className="space-y-6">
                         {/* Login Method Tabs */}
-                        <div className="grid grid-cols-3 gap-2 p-1 rounded-lg bg-gray-700/50">
+                        {/* <div className="grid grid-cols-3 gap-2 p-1 rounded-lg bg-gray-700/50">
                             <button
                                 type="button"
                                 onClick={() => setLoginMethod('email')}
@@ -88,82 +86,33 @@ export default function Login({ status, canResetPassword }) {
                                 <MessageSquare className="w-4 h-4 mr-1" />
                                 Telegram
                             </button>
-                        </div>
+                        </div> */}
 
                         {/* Login Fields */}
-                        {loginMethod === 'email' && (
-                            <div className="space-y-2">
-                                <label htmlFor="email" className="block text-sm font-medium text-gray-200">
-                                    Email Address
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Mail className="w-5 h-5 text-gray-400" />
-                                    </div>
-                                    <input
-                                        id="email"
-                                        type="email"
-                                        name="email"
-                                        value={data.email}
-                                        onChange={handleInputChange}
-                                        className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-colors"
-                                        placeholder="Enter your email"
-                                        autoComplete="username"
-                                        autoFocus
-                                        required
-                                    />
-                                </div>
-                                {errors.email && <div className="text-red-400 text-sm mt-1">{errors.email}</div>}
-                            </div>
-                        )}
 
-                        {loginMethod === 'phone' && (
-                            <div className="space-y-2">
-                                <label htmlFor="phone" className="block text-sm font-medium text-gray-200">
-                                    Phone Number
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Smartphone className="w-5 h-5 text-gray-400" />
-                                    </div>
-                                    <input
-                                        id="phone"
-                                        type="tel"
-                                        name="phone"
-                                        value={data.phone}
-                                        onChange={handleInputChange}
-                                        className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-colors"
-                                        placeholder="Enter your phone number"
-                                        required
-                                    />
+                        <div className="space-y-2">
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-200">
+                                Email Address
+                            </label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Mail className="w-5 h-5 text-gray-400" />
                                 </div>
-                                {errors.phone && <div className="text-red-400 text-sm mt-1">{errors.phone}</div>}
+                                <input
+                                    id="email"
+                                    type="email"
+                                    name="email"
+                                    value={data.email}
+                                    onChange={handleInputChange}
+                                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-colors"
+                                    placeholder="Enter your email"
+                                    autoComplete="username"
+                                    autoFocus
+                                    required
+                                />
                             </div>
-                        )}
-
-                        {loginMethod === 'telegram' && (
-                            <div className="space-y-2">
-                                <label htmlFor="telegram" className="block text-sm font-medium text-gray-200">
-                                    Telegram Username
-                                </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <MessageSquare className="w-5 h-5 text-gray-400" />
-                                    </div>
-                                    <input
-                                        id="telegram"
-                                        type="text"
-                                        name="telegram"
-                                        value={data.telegram}
-                                        onChange={handleInputChange}
-                                        className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-colors"
-                                        placeholder="@username"
-                                        required
-                                    />
-                                </div>
-                                {errors.telegram && <div className="text-red-400 text-sm mt-1">{errors.telegram}</div>}
-                            </div>
-                        )}
+                            {errors.email && <div className="text-red-400 text-sm mt-1">{errors.email}</div>}
+                        </div>
 
                         <div className="space-y-2">
                             <label htmlFor="password" className="block text-sm font-medium text-gray-200">

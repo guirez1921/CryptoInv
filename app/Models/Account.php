@@ -28,6 +28,11 @@ class Account extends Model
 
     public function wallets(): HasMany
     {
-        return $this->hasMany(Wallet::class);
+        return $this->hasMany(HdWallet::class);
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(BlockchainTransaction::class);
     }
 }
