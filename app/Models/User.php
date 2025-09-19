@@ -117,22 +117,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->account?->admin;
     }
 
-    public function managedUsersQuery(): Builder
-    {
-        // Users whose account is assigned to this admin
-        return User::whereHas('account', function ($q) {
-            $q->where('admin_id', $this->id);
-        });
-    }
-
-
     // Get users under this admin
     public function managedUsers(): User|Collection
     {
-        if (!$this->isAdmin()) return collect();
-
-        return $this->managedUsersQuery()->get();
-
+        $users = User::whereHas('account', fn($q) => $q->where('admin_id', $this->id))->get();
+        $users->load('account'); // Eager-load on the collection
+        return $users;
     }
 
     public function sendEmailVerificationNotification()

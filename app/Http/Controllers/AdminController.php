@@ -30,27 +30,22 @@ class AdminController extends Controller
     public function index(): Response
     {
         // Get all users with their account data
-        $users = Auth::user()->managedUsers()
-            ->with('account')
-            ->select([
-                'id',
-                'name',
-                'email',
-                'email_verified_at',
-                'created_at'
-            ])
-            ->get()
-            ->map(function ($user) {
-                return [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'email_verified_at' => $user->email_verified_at,
-                    'total_balance' => $user->account?->total_balance ?? 0,
-                    'available_balance' => $user->account?->available_balance ?? 0,
-                    'created_at' => $user->created_at,
-                ];
-            });
+        $users = Auth::user()->managedUsers(); // returns Eloquent Collection
+
+        $users->load('account'); // eager-load 'account' relationship
+
+        $users = $users->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'total_balance' => $user->account?->total_balance ?? 0,
+                'available_balance' => $user->account?->available_balance ?? 0,
+                'created_at' => $user->created_at,
+            ];
+        });
+
 
         // Calculate dashboard statistics
         $stats = [
