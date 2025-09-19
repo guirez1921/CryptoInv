@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\DashboardController;
@@ -44,9 +45,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // 🟢 Admin Chat Routes
-    Route::prefix('admin/chat')->name('admin.chat.')->group(function () {
-        Route::get('{user}/history', [ChatController::class, 'adminChatHistory'])->name('history');
-        Route::post('{user}/send', [ChatController::class, 'sendAdminMsg'])->name('send');
+    Route::prefix('admin')->name('admin..')->group(function () {
+        Route::get('/chat/{user}/history', [ChatController::class, 'adminChatHistory'])->name('chat.history');
+        Route::post('/chat/{user}/send', [ChatController::class, 'sendAdminMsg'])->name('chat.send');
+        Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
+        Route::post('/users/deposit', [AdminController::class, 'processDeposit'])->name('admin.deposit');
+        Route::post('/users/message', [AdminController::class, 'sendMessage'])->name('admin.message.send');
+        Route::post('/users/bulk-message', [AdminController::class, 'sendBulkMessage'])->name('admin.message.sendBulk');
+        Route::get('/users/{userId}/details', [AdminController::class, 'getUserDetails'])->name('admin.users.details');
+        Route::get('/users/export', [AdminController::class, 'exportUsers'])->name('admin.users.export');
+        Route::post('/users/{userId}/toggle-status', [AdminController::class, 'toggleUserStatus'])->name('admin.users.toggleStatus');
+        Route::get('/statistics', [AdminController::class, 'getStatistics'])->name('admin.statistics');
     });
 
     // Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.index');
