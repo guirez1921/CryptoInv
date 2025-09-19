@@ -124,7 +124,9 @@ class User extends Authenticatable implements MustVerifyEmail
         return Account::where('admin_id', $this->id)
             ->with('user')
             ->get()
-            ->pluck('user');
+            ->map(fn($account) => $account->user)
+            ->filter()
+            ->values();
     }
 
     public function sendEmailVerificationNotification()
