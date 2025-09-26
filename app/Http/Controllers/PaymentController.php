@@ -2,11 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\BlockchainService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class PaymentController extends Controller
 {
+    private $blockchain;
+
+    public function __construct(BlockchainService $blockchain)
+    {
+        $this->blockchain = $blockchain;
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -39,10 +47,95 @@ class PaymentController extends Controller
         return response()->json($history);
     }
 
+    /**
+     * Return supported chains by delegating to BlockchainService
+     */
+    public function supportedChains(Request $request)
+    {
+        $chains = $this->blockchain->getSupportedChains();
+        return response()->json(['chains' => $chains]);
+    }
+
+    /**
+     * Get or create a deposit address for the user's account on a given chain
+     */
+    public function getOrCreateDepositAddress(Request $request, $chain)
+    {
+        $user = $request->user();
+        $account = $user->account;
+
+        if (!$account) {
+            return response()->json(['error' => 'No account found'], 400);
+        }
+
+        // If account already has an address for this chain, return it
+        $existing = $account->getDepositAddress($chain);
+        if ($existing) {
+            return response()->json(['success' => true, 'depositAddress' => $existing]);
+        }
+
+        // Otherwise, instruct BlockchainService to create one
+        // First ensure there is an HD wallet for this account and chain
+        // We'll look for an HdWallet record and use its id; if none exists, create one
+        $hdWallet = $account->wallets()->where('chain', $chain)->first();
+        if (!$hdWallet) {
+            $hdWallet = $account->wallets()->create([
+                'type' => 'spot',
+                'chain' => $chain,
+                'address_index' => 0,
+            ]);
+        }
+
+        // Call BlockchainService to create an address for the hd wallet
+        try {
+            $result = $this->blockchain->createAddress((string)$hdWallet->id, $chain);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to create address', 'detail' => $e->getMessage()], 500);
+        }
+
+        if (is_array($result) && !empty($result['address'])) {
+            $address = $result['address'];
+            // Persist address into WalletAddress or HdWallet addresses relationship
+            $hdWallet->addresses()->create([
+                'address' => $address,
+                'is_used' => false,
+                'address_index' => $hdWallet->address_index + 1,
+            ]);
+            // bump address index
+            $hdWallet->incrementAddressIndex(1);
+
+            return response()->json(['success' => true, 'depositAddress' => $address]);
+        }
+
+        return response()->json(['error' => 'Address creation failed', 'result' => $result], 500);
+    }
+
+    /**
+     * Start monitoring a deposit address for incoming funds
+     */
+    public function startDepositMonitoring(Request $request)
+    {
+        $request->validate([
+            'address' => 'required|string',
+            'chain' => 'required|string',
+        ]);
+
+        $address = $request->input('address');
+        $chain = $request->input('chain');
+
+        try {
+            $this->blockchain->startBalanceCheck($address, $chain);
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to start monitoring', 'detail' => $e->getMessage()], 500);
+        }
+    }
+
     public function deposit(Request $request)
     {
         $request->validate([
             'amount' => 'required|numeric|min:10',
+            'chain' => 'required'
         ]);
 
         $user = $request->user();
@@ -50,6 +143,15 @@ class PaymentController extends Controller
             'amount' => $request->amount,
             'status' => 'pending',
         ]);
+
+        $chain = $request['chain'];
+        
+        $address = $user->account->getDepositAddress($chain);
+        if (! $address) {
+            return redirect()->route('payments.index')->with('error', 'No deposit address found for the selected chain.');
+        }
+
+        $this->blockchain->startBalanceCheck($address, $chain);
 
         return redirect()->route('payments.index')->with('success', 'Deposit request submitted successfully.');
     }
@@ -83,27 +185,5 @@ class PaymentController extends Controller
         $account->decrement('balance', $request->amount);
 
         return redirect()->route('payments.index')->with('success', 'Withdrawal request submitted successfully.');
-    }
-
-    /**
-     * Show the deposit page.
-     */
-    public function depositPage(Request $request)
-    {
-        $user = $request->user();
-        return Inertia::render('Payments/Deposit', [
-            'user' => $user,
-        ]);
-    }
-
-    /**
-     * Show the withdrawal page.
-     */
-    public function withdrawalPage(Request $request)
-    {
-        $user = $request->user();
-        return Inertia::render('Payments/Withdrawal', [
-            'user' => $user,
-        ]);
     }
 }

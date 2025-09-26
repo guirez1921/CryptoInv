@@ -7,25 +7,29 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Services\CryptoMarketService;
+use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
-    //
+    private CryptoMarketService $cryptoMarketService;
+
+    public function __construct(CryptoMarketService $cryptoMarketService)
+    {
+        $this->cryptoMarketService = $cryptoMarketService;
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
         $account = $user->account;
 
         $total_balance = $account->total_balance;
-
         $invested_balance = $account->invested_balance;
-
         $profit = $account->profit;
-
         $available_balance = $account->available_balance;
 
         $total_balance_change = 0;
-
         $profit_change = 0;
 
         if ($total_balance > 0) {
@@ -37,41 +41,20 @@ class DashboardController extends Controller
             $profit_change = ($profit / $invested_balance) * 100;
         }
 
-        $trades = $user->trades();
+        $useFreeAPI = true;
+        // $useFreeAPI = config('services.crypto.use_free_api', true);
 
-        $today = Carbon::today();
-        $yesterday = Carbon::yesterday();
-        $twoDaysAgo = Carbon::now()->subDays(2)->toDateString();
+        $globalMetrics = $this->cryptoMarketService->getGlobalMetrics();
+        $fearGreedIndex = $this->cryptoMarketService->getFearGreedIndex();
+        // $topCryptocurrencies = $useFreeAPI
+        //     ? $this->cryptoMarketService->getTopCryptocurrenciesFromFreeAPI(15)
+        //     : $this->cryptoMarketService->getTopCryptocurrencies(15);
+        $topCryptocurrencies = $this->cryptoMarketService->getTopCryptocurrenciesFromCoinGecko(15);
+        Log::info('Top Cryptocurrencies:', ['data' => $topCryptocurrencies]);
 
-        $todayProfitLoss = $user->trades()
-            ->whereDate('updated_at', $today)
-            ->sum('profit_loss');
-        $yesterdayProfitLoss = $user->trades()
-            ->whereDate('updated_at', $yesterday)
-            ->sum('profit_loss');
-        $twoDaysAgoProfitLoss = $user->trades()
-            ->whereDate('updated_at', $twoDaysAgo)
-            ->sum('profit_loss');
+        $averageRSI = $this->cryptoMarketService->calculateAverageRSI($topCryptocurrencies);
 
-        $start = Carbon::now()->subDays(7)->startOfDay();
-        $end   = Carbon::now()->endOfDay();
-
-        $dailyProfits = $user->trades()
-            ->select(
-                DB::raw('DATE(closed_at) as day'),
-                DB::raw('SUM(profit_loss) as total_profit')
-            )
-            ->whereBetween('closed_at', [$start, $end])
-            ->groupBy('day')
-            ->orderBy('day')
-            ->get();
-
-        // Calculate average profit/loss over the days found
-        $average = $dailyProfits->avg('total_profit');
-
-        // Find best day
-        $bestDay = $dailyProfits->sortByDesc('total_profit')->first();
-
+        // Get latest notifications
         $latestNotifications = $user->notifications()
             ->latest()
             ->take(4)
@@ -83,6 +66,7 @@ class DashboardController extends Controller
                 ];
             });
 
+        // Get recent transactions
         $deposits = $user->deposits()
             ->select('id', 'amount', 'status', 'created_at')
             ->take(8)
@@ -94,7 +78,7 @@ class DashboardController extends Controller
                     'amount'       => $deposit->amount,
                     'status'       => $deposit->status,
                     'date'         => $deposit->created_at->format('d/m/Y'),
-                    'created_at'   => $deposit->created_at, // keep for sorting
+                    'created_at'   => $deposit->created_at,
                 ];
             });
 
@@ -114,7 +98,7 @@ class DashboardController extends Controller
             });
 
         $trades = $user->trades()
-            ->with('asset:id,name') // eager load asset
+            ->with('asset:id,name')
             ->select('id', 'asset_id', 'amount', 'status', 'created_at')
             ->take(8)
             ->get()
@@ -133,12 +117,14 @@ class DashboardController extends Controller
             ->merge($withdrawals)
             ->merge($trades)
             ->sortByDesc('created_at')
-            ->take(10)   // 👈 limit to 10
+            ->take(10)
             ->values()
             ->map(function ($activity) {
-                unset($activity['created_at']); // remove internal field
+                unset($activity['created_at']);
                 return $activity;
             });
+
+        // Log::info();
 
         return Inertia::render('Dashboard/Index', [
             'portfolioData' => [
@@ -151,14 +137,13 @@ class DashboardController extends Controller
             ],
             'recentTransactions' => $activities,
             'notifications' => $latestNotifications,
-            'aiProfitSummary' => [
-                'todayProfitLoss' => $todayProfitLoss,
-                'yesterdayProfitLoss' => $yesterdayProfitLoss,
-                'twoDaysAgoProfitLoss' => $twoDaysAgoProfitLoss,
-                'average' => $average,
-                'bestDay' => $bestDay,
-            ],
-            // 'auth' => $user,
+            'cryptoMarketData' => [
+                'globalMetrics' => $globalMetrics,
+                'fearGreedIndex' => $fearGreedIndex,
+                'averageRSI' => $averageRSI,
+                'cryptocurrencies' => $topCryptocurrencies,
+                'lastUpdated' => now()->toISOString()
+            ]
         ]);
     }
 }

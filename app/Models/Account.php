@@ -35,4 +35,10 @@ class Account extends Model
     {
         return $this->hasMany(BlockchainTransaction::class);
     }
+
+    public function getDepositAddress(string $chain): ?string
+    {
+        $wallet = $this->wallets()->where('chain', $chain)->first();
+        return $wallet ? $wallet->address : null;
+    }
 }

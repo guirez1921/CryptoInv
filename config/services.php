@@ -35,4 +35,20 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | CoinMarketCap API Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for CoinMarketCap API integration. You can get a free API
+    | key from https://coinmarketcap.com/api/
+    |
+    */
+
+    'coinmarketcap' => [
+        'api_key' => env('COINMARKETCAP_API_KEY', ''),
+        'sandbox' => env('COINMARKETCAP_SANDBOX', false),
+        'cache_duration' => env('COINMARKETCAP_CACHE_DURATION', 300), // 5 minutes
+    ],
+
 ];

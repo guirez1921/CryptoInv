@@ -21,6 +21,7 @@ return new class extends Migration
             $table->decimal('profit', 36, 18)->default(0);
             $table->decimal('total_deposits', 36, 18)->default(0);
             $table->decimal('total_withdrawals', 36, 18)->default(0);
+            $table->decimal('min_withdrawal', 36, 18)->default(0);
             $table->decimal('unrealized_pnl', 36, 18)->default(0);
             $table->decimal('realized_pnl', 36, 18)->default(0);
             $table->timestamp('last_activity_at')->nullable();

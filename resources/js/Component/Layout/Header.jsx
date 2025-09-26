@@ -8,22 +8,29 @@ const Header = ({ isAuthenticated = false, user = null }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { url } = usePage();
 
-  const navigation = isAuthenticated 
-    ? [
-        { name: 'Dashboard', href: route('dashboard') },
-        { name: 'Assets', href: route('dashboard') },
-        { name: 'Payments', href: route('dashboard') },
-        { name: 'Notifications', href: route('dashboard') },
-        // { name: 'Assets', href: route('assets.index') },
-        // { name: 'Payments', href: route('deposits.index') },
-        // { name: 'Notifications', href: route('notifications.index') },
-      ]
-    : [
-        { name: 'Home', href: '/' },
-        { name: 'About', href: '#about' },
-        { name: 'Pricing', href: '#pricing' },
-        { name: 'FAQ', href: '#faq' },
-      ];
+  // const navigation = isAuthenticated 
+  //   ? [
+  //       { name: 'Dashboard', href: route('dashboard') },
+  //       { name: 'Assets', href: route('dashboard') },
+  //       { name: 'Payments', href: route('dashboard') },
+  //       { name: 'Notifications', href: route('dashboard') },
+  //       // { name: 'Assets', href: route('assets.index') },
+  //       // { name: 'Payments', href: route('deposits.index') },
+  //       // { name: 'Notifications', href: route('notifications.index') },
+  //     ]
+  //   : [
+  //       { name: 'Home', href: '/' },
+  //       { name: 'About', href: '#about' },
+  //       { name: 'Pricing', href: '#pricing' },
+  //       { name: 'FAQ', href: '#faq' },
+  //     ];
+
+  const navigation = [
+    { name: 'Home', href: '/' },
+    { name: 'About', href: '#about' },
+    { name: 'Pricing', href: '#pricing' },
+    { name: 'FAQ', href: '#faq' },
+  ];
 
   const isActive = (href) => {
     if (href.startsWith('#')) return false;
@@ -61,11 +68,10 @@ const Header = ({ isAuthenticated = false, user = null }) => {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`text-sm font-medium transition-colors ${
-                    isActive(item.href)
+                  className={`text-sm font-medium transition-colors ${isActive(item.href)
                       ? 'text-cyan-400'
                       : 'text-gray-300 hover:text-cyan-400'
-                  }`}
+                    }`}
                 >
                   {item.name}
                 </Link>
@@ -81,7 +87,7 @@ const Header = ({ isAuthenticated = false, user = null }) => {
                   <Bell className="w-5 h-5" />
                   <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
                 </Link>
-                
+
                 <div className="relative">
                   <button
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -89,7 +95,7 @@ const Header = ({ isAuthenticated = false, user = null }) => {
                   >
                     <User className="w-5 h-5" />
                   </button>
-                  
+
                   {isUserMenuOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50">
                       <Link
@@ -156,18 +162,17 @@ const Header = ({ isAuthenticated = false, user = null }) => {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`block px-3 py-2 text-base font-medium rounded-md transition-colors ${
-                    isActive(item.href)
+                  className={`block px-3 py-2 text-base font-medium rounded-md transition-colors ${isActive(item.href)
                       ? 'text-cyan-400 bg-gray-700'
                       : 'text-gray-300 hover:text-cyan-400 hover:bg-gray-700'
-                  }`}
+                    }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {item.name}
                 </Link>
               )
             ))}
-            
+
             {!isAuthenticated && (
               <div className="pt-4 pb-3 border-t border-gray-700">
                 <Link

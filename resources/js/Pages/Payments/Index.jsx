@@ -13,6 +13,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { router, usePage } from '@inertiajs/react';
+import { route } from 'ziggy-js';
 import QRCodeLib from 'qrcode';
 import CryptoAIAuthLayout from '@/Layouts/CryptoAIAuthLayout';
 import Card from '@/component/UI/Card';
@@ -44,9 +45,27 @@ const PaymentIndex = () => {
 
   // Get data from props
   const availableBalance = account?.balance || 0;
-  const minimumWithdrawal = 100;
-  const withdrawalQuota = 20000;
+  const [minimumWithdrawal, setMinimumWithdrawal] = useState(50000);
   const canWithdraw = availableBalance >= minimumWithdrawal;
+
+  // Fetch minimum withdrawal from server on mount
+  useEffect(() => {
+    let mounted = true;
+    const fetchMin = async () => {
+      try {
+        const res = await fetch(route('settings.getMinWithdrawal'));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const val = data.min_withdrawal ?? data.minWithdrawal ?? data.min ?? 50000;
+        if (mounted) setMinimumWithdrawal(Number(val));
+      } catch (err) {
+        console.error('Error fetching minimum withdrawal:', err);
+        // keep default fallback of 50000
+      }
+    };
+    fetchMin();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     fetchSupportedChains();
@@ -75,8 +94,10 @@ const PaymentIndex = () => {
   const fetchSupportedChains = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/chains/supported`, {
-        headers: API_HEADERS
+      const response = await fetch(route('payments.supportedChains'), {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       if (response.ok) {
@@ -130,8 +151,10 @@ const PaymentIndex = () => {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/hd-wallet/${accountId}/${selectedChain}/deposit-address`, {
-        headers: API_HEADERS
+      const response = await fetch(route('payments.getDepositAddress', { chain: selectedChain }), {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       if (response.ok) {
@@ -170,7 +193,20 @@ const PaymentIndex = () => {
         amount: parseFloat(amount),
         chain: selectedChain
       }, {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // start monitoring the deposit address if we have one
+          try {
+            if (depositAddress) {
+              await fetch(route('payments.startDepositMonitoring'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: depositAddress, chain: selectedChain })
+              });
+            }
+          } catch (err) {
+            console.error('Failed to start deposit monitoring', err);
+          }
+
           setAmount('');
           setDepositAddress('');
           setAddressGenerated(false);
@@ -203,10 +239,7 @@ const PaymentIndex = () => {
       return;
     }
 
-    if (withdrawAmountFloat > withdrawalQuota) {
-      alert(`Withdrawal amount exceeds quota of $${withdrawalQuota.toLocaleString()}`);
-      return;
-    }
+    // No maximum withdrawal quota enforced on the client; server will validate limits
 
     if (!withdrawAddress || !withdrawChain) {
       alert('Please fill in all required fields');
@@ -598,13 +631,13 @@ const PaymentIndex = () => {
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     min={minimumWithdrawal}
-                    max={Math.min(availableBalance, withdrawalQuota)}
+                    max={availableBalance}
                     step="0.01"
                     placeholder="Enter amount"
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Available: ${availableBalance.toFixed(2)} | Minimum: ${minimumWithdrawal} | Maximum: ${withdrawalQuota.toLocaleString()}
+                    <p className="text-xs text-gray-400 mt-1">
+                    Available: ${availableBalance.toFixed(2)} | Minimum: ${minimumWithdrawal}
                   </p>
                 </div>
 

@@ -20,6 +20,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
     // Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
     Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
+    // Internal endpoints used by the frontend to fetch blockchain data via BlockchainService
+    Route::get('/payments/chains/supported', [PaymentController::class, 'supportedChains'])->name('payments.supportedChains');
+    Route::get('/payments/{chain}/deposit-address', [PaymentController::class, 'getOrCreateDepositAddress'])->name('payments.getDepositAddress');
+    Route::post('/payments/deposit/monitor', [PaymentController::class, 'startDepositMonitoring'])->name('payments.startDepositMonitoring');
     Route::get('/payments/deposit', [PaymentController::class, 'depositPage'])->name('payments.depositPage');
     Route::get('/payments/withdraw', [PaymentController::class, 'withdrawalPage'])->name('payments.withdrawalPage');
     Route::get('/payments/history', [PaymentController::class, 'updateHistory'])->name('payments.history');
@@ -49,13 +53,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/chat/{user}/history', [ChatController::class, 'adminChatHistory'])->name('chat.history');
         Route::post('/chat/{user}/send', [ChatController::class, 'sendAdminMsg'])->name('chat.send');
         Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
-        Route::post('/users/deposit', [AdminController::class, 'processDeposit'])->name('admin.deposit');
-        Route::post('/users/message', [AdminController::class, 'sendMessage'])->name('admin.message.send');
-        Route::post('/users/bulk-message', [AdminController::class, 'sendBulkMessage'])->name('admin.message.sendBulk');
-        Route::get('/users/{userId}/details', [AdminController::class, 'getUserDetails'])->name('admin.users.details');
-        Route::get('/users/export', [AdminController::class, 'exportUsers'])->name('admin.users.export');
-        Route::post('/users/{userId}/toggle-status', [AdminController::class, 'toggleUserStatus'])->name('admin.users.toggleStatus');
-        Route::get('/statistics', [AdminController::class, 'getStatistics'])->name('admin.statistics');
+        Route::post('/users/deposit', [AdminController::class, 'processDeposit'])->name('deposit');
+        Route::post('/users/message', [AdminController::class, 'sendMessage'])->name('message.send');
+        Route::post('/users/bulk-message', [AdminController::class, 'sendBulkMessage'])->name('message.sendBulk');
+        Route::get('/users/{userId}/details', [AdminController::class, 'getUserDetails'])->name('users.details');
+        Route::get('/users/export', [AdminController::class, 'exportUsers'])->name('users.export');
+        Route::post('/users/{userId}/toggle-status', [AdminController::class, 'toggleUserStatus'])->name('users.toggleStatus');
+        Route::get('/statistics', [AdminController::class, 'getStatistics'])->name('statistics');
     });
 
     // Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.index');
@@ -69,6 +73,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
     // Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Settings routes
+    Route::get('/settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
+    Route::post('/settings/min-withdrawal', [App\Http\Controllers\SettingsController::class, 'updateMinWithdrawal'])->name('settings.updateMinWithdrawal');
+    Route::get('/settings/min-withdrawal', [App\Http\Controllers\SettingsController::class, 'getMinWithdrawal'])->name('settings.getMinWithdrawal');
 
 });
 

@@ -17,6 +17,9 @@ return new class extends Migration
             $table->string('address')->unique()->index();
             $table->unsignedInteger('address_index');
             $table->string('derivation_path');
+            $table->string('chain');
+            $table->string('type')->default('spot'); // e.g., spot, margin, futures
+            $table->string('asset')->nullable(); // e.g., ETH, BTC
             $table->enum('purpose', ['deposit', 'change', 'trading', 'cold_storage'])->default('deposit');
             $table->decimal('balance', 36, 18)->default(0);
             $table->decimal('gas_balance', 36, 18)->default(0);

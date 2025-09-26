@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Models\Wallet;
+use App\Services\BlockchainService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
@@ -11,12 +12,14 @@ use Illuminate\Support\Facades\Log;
 
 class CreateWalletOnRegister
 {
+    private $blockchain;
+
     /**
      * Create the event listener.
      */
-    public function __construct()
+    public function __construct(BlockchainService $blockchain)
     {
-        //
+        $this->blockchain = $blockchain;
     }
 
     /**
@@ -35,25 +38,7 @@ class CreateWalletOnRegister
 
         try {
             // Call Node.js API to generate wallet
-            $response = Http::withHeaders([
-                'x-api-key' => env('API_KEY'),
-            ])->post("http://127.0.0.1:4000/api/wallet/new/{$account->id}");
-
-            if ($response->successful()) {
-                $walletData = $response->json();
-
-                Log::info("Wallet created for user {$user->id}", $walletData);
-
-                // ⚡ No need to create Wallet in Laravel again
-                // Node.js already inserted it into the DB
-                // If you want to keep a local copy synced, you could refresh:
-                // $account->load('wallet');
-            } else {
-                Log::error("Wallet creation failed for user {$user->id}", [
-                    'status' => $response->status(),
-                    'body'   => $response->body(),
-                ]);
-            }
+            $this->blockchain->createHDWallet($account->id);
         } catch (\Exception $e) {
             Log::error("Error calling Node.js service for user {$user->id}: " . $e->getMessage());
         }
