@@ -33,7 +33,7 @@ class FetchCryptoMarketData extends Command
             $limit = 20;
 
             // Fetch and cache top cryptocurrencies
-            $cryptoMarketService->getTopCryptocurrencies($limit);
+            // $cryptoMarketService->getTopCryptocurrencies($limit);
 
             // Optionally fetch from FreeCryptoAPI or CoinGecko
             // $cryptoMarketService->getTopCryptocurrenciesFromFreeAPI($limit);
