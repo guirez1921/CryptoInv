@@ -6,6 +6,7 @@ use App\Services\BlockchainService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use App\Models\HdWallet;
 
 class PaymentController extends Controller
 {
@@ -111,12 +112,27 @@ class PaymentController extends Controller
         // Otherwise, instruct BlockchainService to create one
         $hdWallet = $account->wallets()->where('chain', $chain)->first();
         if (!$hdWallet) {
-            Log::info('[PaymentController@getOrCreateDepositAddress] creating hdWallet', ['account_id' => $accountId, 'chain' => $chain]);
-            $hdWallet = $account->wallets()->create([
-                'type' => 'spot',
-                'chain' => $chain,
-                'address_index' => 0,
-            ]);
+            Log::info('[PaymentController@getOrCreateDepositAddress] creating hdWallet via BlockchainService', ['account_id' => $accountId, 'chain' => $chain]);
+            try {
+                // Delegate HD wallet creation to BlockchainService so the required encrypted_seed is set
+                $created = $this->blockchain->createHDWallet((string)$accountId, $chain, 'spot');
+                Log::debug('[PaymentController@getOrCreateDepositAddress] createHDWallet result', ['account_id' => $accountId, 'chain' => $chain, 'result' => $created]);
+
+                // If the node service returned a wallet id, load the Eloquent model
+                if (is_array($created) && !empty($created['walletId'])) {
+                    $hdWallet = HdWallet::find($created['walletId']);
+                    if (! $hdWallet) {
+                        Log::error('[PaymentController@getOrCreateDepositAddress] hdWallet not found after create', ['walletId' => $created['walletId']]);
+                        return response()->json(['error' => 'HD wallet created but not found locally'], 500);
+                    }
+                } else {
+                    Log::error('[PaymentController@getOrCreateDepositAddress] createHDWallet returned unexpected result', ['result' => $created]);
+                    return response()->json(['error' => 'Failed to create hd wallet', 'result' => $created], 500);
+                }
+            } catch (\Exception $e) {
+                Log::error('[PaymentController@getOrCreateDepositAddress] createHDWallet failed', ['account_id' => $accountId, 'chain' => $chain, 'error' => $e->getMessage()]);
+                return response()->json(['error' => 'Failed to create hd wallet', 'detail' => $e->getMessage()], 500);
+            }
         }
 
         // Call BlockchainService to create an address for the hd wallet

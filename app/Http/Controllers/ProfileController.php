@@ -185,7 +185,15 @@ class ProfileController extends Controller
             'address' => ['required', 'string', 'max:255'],
         ]);
 
-        Auth::user()->account()->wallets()->create([
+        $user = Auth::user();
+        $account = $user->account;
+        if (! $account) {
+            return back()->with('error', 'No account available to attach wallet to.');
+        }
+
+        // Create an external Wallet record (uses `wallets` table) rather than HD wallet
+        \App\Models\Wallet::create([
+            'account_id' => $account->id,
             'type' => $validated['type'],
             'address' => $validated['address'],
             'is_active' => true,

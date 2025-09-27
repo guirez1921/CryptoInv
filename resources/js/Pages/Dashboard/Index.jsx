@@ -30,12 +30,14 @@ const Dashboard = ({
           throw new Error(`Failed to fetch min withdrawal: ${res.status}`);
         }
         const data = await res.json();
+        console.log(data);
         // support different possible keys returned by the endpoint
         const val = data.min_withdrawal ?? data.minWithdrawal ?? data.min ?? 0;
         if (!mounted) return;
         setMinWithdrawalValue(val);
-        if (val === 0) {
+        if (Math.round(val) === 0) {
           setShowMinWithdrawalModal(true);
+          console.log('Minimum withdrawal is 0, showing modal.');
         }
       } catch (error) {
         console.error('Error fetching minimum withdrawal:', error);
