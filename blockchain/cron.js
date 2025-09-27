@@ -1,7 +1,7 @@
 // balanceCron.js
 const cron = require("node-cron");
-const WalletService = require("./WalletService");
-const { broadcast } = require("./broadcaster");
+const WalletService = require("./service");
+const { broadcast } = require("./broadcast");
 
 async function startBalanceCron(address, chain) {
   let runCount = 0;

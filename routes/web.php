@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -75,10 +76,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Settings routes
-    Route::get('/settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
-    Route::post('/settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
-    Route::post('/settings/min-withdrawal', [App\Http\Controllers\SettingsController::class, 'updateMinWithdrawal'])->name('settings.updateMinWithdrawal');
-    Route::get('/settings/min-withdrawal', [App\Http\Controllers\SettingsController::class, 'getMinWithdrawal'])->name('settings.getMinWithdrawal');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::post('/settings/min-withdrawal', [SettingsController::class, 'updateMinWithdrawal'])->name('settings.updateMinWithdrawal');
+    Route::get('/settings/min-withdrawal', [SettingsController::class, 'getMinWithdrawal'])->name('settings.getMinWithdrawal');
+
+    
 
 });
 

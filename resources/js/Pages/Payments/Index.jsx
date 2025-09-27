@@ -19,14 +19,6 @@ import CryptoAIAuthLayout from '@/Layouts/CryptoAIAuthLayout';
 import Card from '@/component/UI/Card';
 import Button from '@/component/UI/Button';
 
-const API_PORT = import.meta.env.VITE_PORT || 4000;
-const API_KEY = import.meta.env.VITE_API_KEY;
-const API_BASE = `http://localhost:${API_PORT}`;
-const API_HEADERS = {
-    'Content-Type': 'application/json',
-    'x-api-key': API_KEY
-};
-
 const PaymentIndex = () => {
   const { history, totals, user, account, accountId } = usePage().props;
   const [activeTab, setActiveTab] = useState('deposit');

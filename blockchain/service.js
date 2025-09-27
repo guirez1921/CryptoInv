@@ -4,7 +4,7 @@ const bitcoin = require('bitcoinjs-lib');
 const { Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
 const bip39 = require('bip39');
 const bip32 = require('bip32');
-const HDWalletDB = require('./wallet');
+const HDWalletDB = require('./database');
 
 const rpcMap = {
     // Ethereum and EVM chains
@@ -380,6 +380,38 @@ class WalletService {
             isActive: hdWallet.is_active,
             createdAt: hdWallet.created_at
         };
+    }
+
+    /**
+     * Return a list of supported chains and basic metadata for each
+     * @returns {Promise<Array<Object>>}
+     */
+    static async getSupportedChains() {
+        try {
+            const chains = Object.keys(SUPPORTED_WALLETS).map((key) => {
+                const info = SUPPORTED_WALLETS[key] || {};
+                const prettyName = (key || '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                const symbol = info.nativeCurrency || key.toUpperCase();
+                return {
+                    key,
+                    // human friendly name (Title Case)
+                    name: prettyName,
+                    type: info.type || null,
+                    coinType: info.coinType ?? null,
+                    nativeCurrency: info.nativeCurrency || null,
+                    // symbol used in UI (fallback to uppercase key)
+                    symbol,
+                    rpc: rpcMap[key] || null,
+                    // sensible defaults for UI/clients
+                    minDeposit: info.minDeposit ?? null,
+                    withdrawalFee: info.withdrawalFee ?? null,
+                };
+            });
+
+            return chains;
+        } catch (error) {
+            throw new Error(`Failed to get supported chains: ${error.message}`);
+        }
     }
 
     /**

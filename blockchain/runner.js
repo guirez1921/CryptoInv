@@ -1,4 +1,4 @@
-const WalletService = require('./WalletService');
+const WalletService = require('./service');
 const startBalanceCron = require('./cron');
 
 (async () => {

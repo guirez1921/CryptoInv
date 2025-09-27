@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\BlockchainService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class PaymentController extends Controller
@@ -18,12 +19,26 @@ class PaymentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
+        $userId = $user?->id;
+        Log::info('[PaymentController@index] rendering payments index', ['user_id' => $userId]);
+
         $history = $user->paymentHistoryQuery()->paginate(10);
 
         $total_deposits = $user->deposits()->sum('amount');
         $total_withdrawals = $user->withdrawals()->sum('amount');
         $pending_withdrawals = $user->withdrawals()->where('status', 'pending')->sum('amount');
         $pending_deposits = $user->deposits()->where('status', 'pending')->sum('amount');
+
+        Log::debug('[PaymentController@index] fetched totals and history', [
+            'user_id' => $userId,
+            'totals' => [
+                'deposits' => $total_deposits,
+                'withdrawals' => $total_withdrawals,
+                'pending_withdrawals' => $pending_withdrawals,
+                'pending_deposits' => $pending_deposits,
+            ],
+            'history_count' => $history->count()
+        ]);
 
         return Inertia::render('Payments/Index', [
             'history' => $history,
@@ -42,8 +57,12 @@ class PaymentController extends Controller
     public function history(Request $request)
     {
         $user = $request->user();
+        $userId = $user?->id;
+        Log::info('[PaymentController@history] fetching history', ['user_id' => $userId]);
+
         $history = $user->paymentHistoryQuery()->paginate(10);
 
+        Log::debug('[PaymentController@history] returning history', ['user_id' => $userId, 'count' => $history->count()]);
         return response()->json($history);
     }
 
@@ -52,8 +71,18 @@ class PaymentController extends Controller
      */
     public function supportedChains(Request $request)
     {
-        $chains = $this->blockchain->getSupportedChains();
-        return response()->json(['chains' => $chains]);
+        $user = $request->user();
+        $userId = $user?->id;
+        Log::info('[PaymentController@supportedChains] request', ['user_id' => $userId]);
+
+        try {
+            $chains = $this->blockchain->getSupportedChains();
+            Log::debug('[PaymentController@supportedChains] result', ['user_id' => $userId, 'chains_count' => is_array($chains) ? count($chains) : 0]);
+            return response()->json(['chains' => $chains]);
+        } catch (\Exception $e) {
+            Log::error('[PaymentController@supportedChains] failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
+            return response()->json(['chains' => []], 500);
+        }
     }
 
     /**
@@ -62,23 +91,27 @@ class PaymentController extends Controller
     public function getOrCreateDepositAddress(Request $request, $chain)
     {
         $user = $request->user();
+        $userId = $user?->id;
         $account = $user->account;
+        $accountId = $account?->id;
+        Log::info('[PaymentController@getOrCreateDepositAddress] start', ['user_id' => $userId, 'account_id' => $accountId, 'chain' => $chain]);
 
         if (!$account) {
+            Log::warning('[PaymentController@getOrCreateDepositAddress] no account', ['user_id' => $userId]);
             return response()->json(['error' => 'No account found'], 400);
         }
 
         // If account already has an address for this chain, return it
         $existing = $account->getDepositAddress($chain);
         if ($existing) {
+            Log::info('[PaymentController@getOrCreateDepositAddress] existing address found', ['account_id' => $accountId, 'chain' => $chain]);
             return response()->json(['success' => true, 'depositAddress' => $existing]);
         }
 
         // Otherwise, instruct BlockchainService to create one
-        // First ensure there is an HD wallet for this account and chain
-        // We'll look for an HdWallet record and use its id; if none exists, create one
         $hdWallet = $account->wallets()->where('chain', $chain)->first();
         if (!$hdWallet) {
+            Log::info('[PaymentController@getOrCreateDepositAddress] creating hdWallet', ['account_id' => $accountId, 'chain' => $chain]);
             $hdWallet = $account->wallets()->create([
                 'type' => 'spot',
                 'chain' => $chain,
@@ -88,8 +121,11 @@ class PaymentController extends Controller
 
         // Call BlockchainService to create an address for the hd wallet
         try {
+            Log::info('[PaymentController@getOrCreateDepositAddress] calling blockchain service', ['hdWalletId' => $hdWallet->id, 'chain' => $chain]);
             $result = $this->blockchain->createAddress((string)$hdWallet->id, $chain);
+            Log::debug('[PaymentController@getOrCreateDepositAddress] blockchain result', ['result' => $result]);
         } catch (\Exception $e) {
+            Log::error('[PaymentController@getOrCreateDepositAddress] createAddress failed', ['hdWalletId' => $hdWallet->id ?? null, 'error' => $e->getMessage()]);
             return response()->json(['error' => 'Failed to create address', 'detail' => $e->getMessage()], 500);
         }
 
@@ -104,9 +140,11 @@ class PaymentController extends Controller
             // bump address index
             $hdWallet->incrementAddressIndex(1);
 
+            Log::info('[PaymentController@getOrCreateDepositAddress] address persisted', ['hdWalletId' => $hdWallet->id, 'address' => $address]);
             return response()->json(['success' => true, 'depositAddress' => $address]);
         }
 
+        Log::error('[PaymentController@getOrCreateDepositAddress] address creation failed', ['hdWalletId' => $hdWallet->id ?? null, 'result' => $result]);
         return response()->json(['error' => 'Address creation failed', 'result' => $result], 500);
     }
 
@@ -115,6 +153,9 @@ class PaymentController extends Controller
      */
     public function startDepositMonitoring(Request $request)
     {
+        $user = $request->user();
+        $userId = $user?->id;
+
         $request->validate([
             'address' => 'required|string',
             'chain' => 'required|string',
@@ -122,11 +163,14 @@ class PaymentController extends Controller
 
         $address = $request->input('address');
         $chain = $request->input('chain');
+        Log::info('[PaymentController@startDepositMonitoring] start', ['user_id' => $userId, 'address' => $address, 'chain' => $chain]);
 
         try {
             $this->blockchain->startBalanceCheck($address, $chain);
+            Log::info('[PaymentController@startDepositMonitoring] monitoring_started', ['user_id' => $userId, 'address' => $address]);
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
+            Log::error('[PaymentController@startDepositMonitoring] failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
             return response()->json(['error' => 'Failed to start monitoring', 'detail' => $e->getMessage()], 500);
         }
     }
@@ -137,21 +181,31 @@ class PaymentController extends Controller
             'amount' => 'required|numeric|min:10',
             'chain' => 'required'
         ]);
-
         $user = $request->user();
-        $user->deposits()->create([
+        $userId = $user?->id;
+        $accountId = $user->account?->id;
+        Log::info('[PaymentController@deposit] start', ['user_id' => $userId, 'account_id' => $accountId, 'amount' => $request->amount, 'chain' => $request->chain]);
+
+        $deposit = $user->deposits()->create([
             'amount' => $request->amount,
             'status' => 'pending',
         ]);
 
+        Log::debug('[PaymentController@deposit] deposit_created', ['user_id' => $userId, 'deposit_id' => $deposit->id ?? null]);
+
         $chain = $request['chain'];
-        
         $address = $user->account->getDepositAddress($chain);
         if (! $address) {
+            Log::warning('[PaymentController@deposit] no_deposit_address', ['user_id' => $userId, 'chain' => $chain]);
             return redirect()->route('payments.index')->with('error', 'No deposit address found for the selected chain.');
         }
 
-        $this->blockchain->startBalanceCheck($address, $chain);
+        try {
+            $this->blockchain->startBalanceCheck($address, $chain);
+            Log::info('[PaymentController@deposit] started_balance_check', ['user_id' => $userId, 'address' => $address, 'chain' => $chain]);
+        } catch (\Exception $e) {
+            Log::error('[PaymentController@deposit] startBalanceCheck failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
+        }
 
         return redirect()->route('payments.index')->with('success', 'Deposit request submitted successfully.');
     }
@@ -161,28 +215,33 @@ class PaymentController extends Controller
         $request->validate([
             'amount' => 'required|numeric|min:10',
         ]);
-
         $user = $request->user();
+        $userId = $user?->id;
         $account = $user->account;
+        $accountId = $account?->id;
+        Log::info('[PaymentController@withdraw] start', ['user_id' => $userId, 'account_id' => $accountId, 'amount' => $request->amount]);
 
         // Set withdrawal quota
         $withdrawalQuota = 20000;
 
         if ($request->amount > $withdrawalQuota) {
+            Log::warning('[PaymentController@withdraw] exceeds_quota', ['user_id' => $userId, 'amount' => $request->amount, 'quota' => $withdrawalQuota]);
             return redirect()->route('payments.index')->with('error', 'Withdrawal amount exceeds the quota of $20,000.');
         }
 
         if ($request->amount > $account->balance) {
+            Log::warning('[PaymentController@withdraw] insufficient_balance', ['user_id' => $userId, 'amount' => $request->amount, 'balance' => $account->balance]);
             return redirect()->route('payments.index')->with('error', 'Insufficient balance for withdrawal.');
         }
 
-        $user->withdrawals()->create([
+        $withdrawal = $user->withdrawals()->create([
             'amount' => $request->amount,
             'status' => 'pending',
         ]);
 
         // Deduct from balance immediately
         $account->decrement('balance', $request->amount);
+        Log::info('[PaymentController@withdraw] withdrawal_created', ['user_id' => $userId, 'withdrawal_id' => $withdrawal->id ?? null, 'new_balance' => $account->balance]);
 
         return redirect()->route('payments.index')->with('success', 'Withdrawal request submitted successfully.');
     }
