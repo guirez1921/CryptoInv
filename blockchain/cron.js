@@ -1,3 +1,6 @@
+// Load shared Laravel .env
+// try { require('./env').loadEnv(); } catch (e) {}
+
 // balanceCron.js
 const cron = require("node-cron");
 const WalletService = require("./service");
@@ -42,4 +45,6 @@ async function startBalanceCron(address, chain) {
   task.start();
 }
 
-module.exports = { startBalanceCron };
+// Export the function directly for simple requires, and keep named export for compatibility
+module.exports = startBalanceCron;
+module.exports.startBalanceCron = startBalanceCron;

@@ -1,10 +1,20 @@
-// services/walletService.js - Fixed version with proper exports
+// Load shared Laravel .env
+// try { require('./env').loadEnv(); } catch (e) { }
+
+// services/walletService.js - Enhanced version with Tron and USDT support
 const { ethers } = require('ethers');
 const bitcoin = require('bitcoinjs-lib');
-const { Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
+const { Connection, PublicKey, LAMPORTS_PER_SOL, Keypair, Transaction, SystemProgram } = require('@solana/web3.js');
+const crypto = require('crypto');
 const bip39 = require('bip39');
-const bip32 = require('bip32');
+// bip32 v5 exports a factory; create an instance with tiny-secp256k1
+const { BIP32Factory } = require('bip32');
+const ecc = require('tiny-secp256k1');
+const bip32 = BIP32Factory(ecc);
 const HDWalletDB = require('./database');
+
+// You'll need to install tronweb: npm install tronweb
+const TronWeb = require('tronweb');
 
 const rpcMap = {
     // Ethereum and EVM chains
@@ -22,12 +32,30 @@ const rpcMap = {
     // Solana
     solana: "https://api.mainnet-beta.solana.com",
     solanaDevnet: "https://api.devnet.solana.com",
+    // Tron
+    tron: "https://api.trongrid.io",
+    tronShasta: "https://api.shasta.trongrid.io",
+    tronNile: "https://nile.trongrid.io",
 };
 
 const derivationPaths = {
     "BTC": "m/44'/0'/0'/0",
     "ETH": "m/44'/60'/0'/0",
-    "SOL": "m/44'/501'/0'/0'"
+    "SOL": "m/44'/501'/0'/0'",
+    "TRX": "m/44'/195'/0'/0", // Tron derivation path
+};
+
+// Token contract addresses
+const TOKEN_CONTRACTS = {
+    USDT: {
+        ethereum: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        tron: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", // USDT TRC20 contract
+    },
+    // You can add more tokens here
+    USDC: {
+        ethereum: "0xA0b86a33E6441B6A9Ff84FC6C7Fe3C8e0aFa73DE",
+        polygon: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+    }
 };
 
 const SUPPORTED_WALLETS = {
@@ -76,6 +104,10 @@ const SUPPORTED_WALLETS = {
     // Solana
     solana: { type: 'SOL', coinType: 501, nativeCurrency: 'SOL' },
     solanaDevnet: { type: 'SOL', coinType: 501, nativeCurrency: 'SOL' },
+    // Tron
+    tron: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX' },
+    tronShasta: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX' },
+    tronNile: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX' },
 };
 
 class WalletService {
@@ -86,7 +118,7 @@ class WalletService {
             const mnemonic = bip39.generateMnemonic();
 
             // Create HD wallet in database
-            const hdWallet = await HDWalletDB.createHDWallet(accountId, mnemonic, chain, type);
+            const hdWallet = await HDWalletDB.createHDWallet(accountId, mnemonic, type);
 
             // Generate the first address
             const firstAddress = await this.createAddress(hdWallet.id, chain, 0);
@@ -107,6 +139,15 @@ class WalletService {
         try {
             const hdWallet = await HDWalletDB.getHDWallet(hdWalletId);
             if (!hdWallet) throw new Error('HD Wallet not found');
+
+            // If an address already exists for this hdWallet and chain, return it (idempotent per-chain)
+            const existingAddresses = await HDWalletDB.getWalletAddresses(hdWalletId);
+            if (existingAddresses && existingAddresses.length > 0) {
+                const existingForChain = existingAddresses.find(a => a.chain === chain);
+                if (existingForChain) {
+                    return existingForChain;
+                }
+            }
 
             const seed = await HDWalletDB.getDecryptedSeed(hdWalletId);
             const seedBuffer = bip39.mnemonicToSeedSync(seed);
@@ -130,6 +171,9 @@ class WalletService {
                     break;
                 case 'SOL':
                     ({ address, derivationPath } = this.generateSOLAddress(seedBuffer, index));
+                    break;
+                case 'TRX':
+                    ({ address, derivationPath } = this.generateTRXAddress(seedBuffer, index));
                     break;
                 default:
                     throw new Error(`Unknown wallet type: ${walletType.type}`);
@@ -160,12 +204,18 @@ class WalletService {
         const derivationPath = `${derivationPaths.ETH}/${index}`;
         const hdNode = bip32.fromSeed(seedBuffer);
         const child = hdNode.derivePath(derivationPath);
-        const wallet = new ethers.Wallet(child.privateKey);
+        try {
+            const pkBuf = Buffer.from(child.privateKey || []);
+            const pkHexStr = pkBuf.length ? '0x' + pkBuf.toString('hex') : null;
+            const wallet = new ethers.Wallet(pkHexStr);
 
-        return {
-            address: wallet.address,
-            derivationPath
-        };
+            return {
+                address: wallet.address,
+                derivationPath
+            };
+        } catch (e) {
+            throw e;
+        }
     }
 
     // Generate Bitcoin address
@@ -175,8 +225,13 @@ class WalletService {
         const hdNode = bip32.fromSeed(seedBuffer, network);
         const child = hdNode.derivePath(derivationPath);
 
+        // bip32 (BIP32Factory + tiny-secp256k1) returns Uint8Array for publicKey.
+        // bitcoinjs-lib expects a Buffer (which is a Node Buffer subclass of Uint8Array)
+        // that also passes tiny-secp256k1's isPoint check. Wrap into Buffer to be safe.
+        const pubkeyBuf = Buffer.from(child.publicKey || []);
+
         const { address } = bitcoin.payments.p2pkh({
-            pubkey: child.publicKey,
+            pubkey: pubkeyBuf,
             network
         });
 
@@ -188,11 +243,17 @@ class WalletService {
 
     // Generate Solana address
     static generateSOLAddress(seedBuffer, index) {
-        const derivationPath = `${derivationPaths.SOL}/${index}`;
-        const hdNode = bip32.fromSeed(seedBuffer);
-        const child = hdNode.derivePath(derivationPath.replace("'", ""));
+        // Use SLIP-0010 (ed25519) derivation to generate Solana keypairs.
+        // Bip32 with tiny-secp256k1 is for secp256k1 and will produce invalid ed25519 keys.
+        const derivationPath = `${derivationPaths.SOL}/${index}'`;
 
-        const publicKey = new PublicKey(child.publicKey);
+        // Derive an ed25519 key using SLIP-0010
+        const derived = this.deriveEd25519Key(derivationPath, seedBuffer);
+
+        // derived.key is 32 bytes private key for ed25519
+        const seed = derived.key.slice(0, 32);
+        const kp = Keypair.fromSeed(seed);
+        const publicKey = kp.publicKey;
 
         return {
             address: publicKey.toString(),
@@ -200,35 +261,178 @@ class WalletService {
         };
     }
 
-    // 3. Check balance of wallet
-    static async checkBalance(walletAddress, chain) {
+    // SLIP-0010 Ed25519 key derivation (minimal implementation)
+    static deriveEd25519Key(path, seed) {
+        // seed: Buffer (from bip39.mnemonicToSeedSync)
+        // path: string like "m/44'/501'/0'/0'/{index}'"
+        const segments = path.split('/');
+
+        // master key
+        let I = crypto.createHmac('sha512', Buffer.from('ed25519 seed')).update(seed).digest();
+        let privateKey = I.slice(0, 32);
+        let chainCode = I.slice(32);
+
+        // iterate path segments after 'm'
+        for (let i = 1; i < segments.length; i++) {
+            const segment = segments[i];
+            if (segment.length === 0) continue;
+
+            const hardened = segment.endsWith("'");
+            const indexStr = hardened ? segment.slice(0, -1) : segment;
+            const index = parseInt(indexStr, 10);
+            if (Number.isNaN(index)) throw new Error(`Invalid path segment: ${segment}`);
+
+            // For ed25519 SLIP10 only hardened derivation is supported.
+            const idx = (index & 0x7fffffff) | 0x80000000;
+
+            const data = Buffer.concat([
+                Buffer.from([0x00]),
+                privateKey,
+                Buffer.from([(idx >> 24) & 0xff, (idx >> 16) & 0xff, (idx >> 8) & 0xff, idx & 0xff])
+            ]);
+
+            I = crypto.createHmac('sha512', chainCode).update(data).digest();
+            privateKey = I.slice(0, 32);
+            chainCode = I.slice(32);
+        }
+
+        return { key: privateKey, chainCode };
+    }
+
+    // Generate Tron address
+    static generateTRXAddress(seedBuffer, index) {
+        const derivationPath = `${derivationPaths.TRX}/${index}`;
+        const hdNode = bip32.fromSeed(seedBuffer);
+        const child = hdNode.derivePath(derivationPath);
+
+        try {
+            const pkBuf = Buffer.from(child.privateKey || []);
+            const pkHexStr = pkBuf.toString('hex');
+
+            // Some tronweb packages export the constructor at different places depending on bundler.
+            // Resolve the constructor safely.
+            const TronWebClass = (TronWeb && TronWeb.default && TronWeb.default.TronWeb) || (TronWeb && TronWeb.TronWeb) || TronWeb;
+            const tronInstance = new TronWebClass({ fullHost: rpcMap['tron'] || 'https://api.trongrid.io' });
+            const address = tronInstance.address.fromPrivateKey(pkHexStr);
+
+            return {
+                address,
+                derivationPath
+            };
+        } catch (e) {
+            throw new Error(`Failed to generate Tron address: ${e.message}`);
+        }
+    }
+
+    // Helper to create a TronWeb instance resilient to different package export shapes
+    static getTronWeb(rpcUrl, options = {}) {
+        const TronWebClass = (TronWeb && TronWeb.default && TronWeb.default.TronWeb) || (TronWeb && TronWeb.TronWeb) || TronWeb;
+        const cfg = Object.assign({ fullHost: rpcUrl || rpcMap['tron'] || 'https://api.trongrid.io' }, options || {});
+        return new TronWebClass(cfg);
+    }
+
+    // 3. Check balance of wallet (supports both native currency and tokens)
+    static async checkBalance(walletAddress, chain, tokenSymbol = null) {
         try {
             const walletType = SUPPORTED_WALLETS[chain];
             if (!walletType) throw new Error(`Unsupported chain: ${chain}`);
 
             let balance = 0;
 
-            switch (walletType.type) {
-                case 'EVM':
-                    balance = await this.getEVMBalance(walletAddress, chain);
-                    break;
-                case 'BTC':
-                    balance = await this.getBTCBalance(walletAddress, chain);
-                    break;
-                case 'SOL':
-                    balance = await this.getSOLBalance(walletAddress, chain);
-                    break;
+            if (tokenSymbol) {
+                // Check token balance
+                balance = await this.getTokenBalance(walletAddress, chain, tokenSymbol);
+            } else {
+                // Check native currency balance
+                switch (walletType.type) {
+                    case 'EVM':
+                        balance = await this.getEVMBalance(walletAddress, chain);
+                        break;
+                    case 'BTC':
+                        balance = await this.getBTCBalance(walletAddress, chain);
+                        break;
+                    case 'SOL':
+                        balance = await this.getSOLBalance(walletAddress, chain);
+                        break;
+                    case 'TRX':
+                        balance = await this.getTRXBalance(walletAddress, chain);
+                        break;
+                }
             }
 
             // Update balance in database
             const dbWalletAddress = await HDWalletDB.getWalletAddressByString(walletAddress);
             if (dbWalletAddress) {
-                await HDWalletDB.updateWalletBalance(dbWalletAddress.id, balance);
+                await HDWalletDB.updateWalletBalance(dbWalletAddress.id, balance, tokenSymbol);
             }
 
             return balance;
         } catch (error) {
             throw new Error(`Failed to check balance: ${error.message}`);
+        }
+    }
+
+    // Get token balance (ERC20/TRC20)
+    static async getTokenBalance(address, chain, tokenSymbol) {
+        const contractAddress = TOKEN_CONTRACTS[tokenSymbol]?.[chain];
+        if (!contractAddress) {
+            throw new Error(`Token ${tokenSymbol} not supported on ${chain}`);
+        }
+
+        const walletType = SUPPORTED_WALLETS[chain];
+
+        switch (walletType.type) {
+            case 'EVM':
+                return await this.getERC20Balance(address, contractAddress, chain);
+            case 'TRX':
+                return await this.getTRC20Balance(address, contractAddress, chain);
+            default:
+                throw new Error(`Token balance not supported for ${walletType.type}`);
+        }
+    }
+
+    // Get ERC20 token balance
+    static async getERC20Balance(address, contractAddress, chain) {
+        const rpcUrl = rpcMap[chain];
+        if (!rpcUrl) throw new Error(`RPC URL not found for chain: ${chain}`);
+
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+
+        // ERC20 ABI for balanceOf function
+        const erc20Abi = [
+            "function balanceOf(address owner) view returns (uint256)",
+            "function decimals() view returns (uint8)"
+        ];
+
+        const contract = new ethers.Contract(contractAddress, erc20Abi, provider);
+
+        try {
+            const [balance, decimals] = await Promise.all([
+                contract.balanceOf(address),
+                contract.decimals()
+            ]);
+
+            return ethers.formatUnits(balance, decimals);
+        } catch (error) {
+            throw new Error(`Failed to get ERC20 balance: ${error.message}`);
+        }
+    }
+
+    // Get TRC20 token balance (USDT on Tron)
+    static async getTRC20Balance(address, contractAddress, chain) {
+        const rpcUrl = rpcMap[chain];
+        const tronWeb = this.getTronWeb(rpcUrl);
+
+        try {
+            const contract = await tronWeb.contract().at(contractAddress);
+            const balance = await contract.balanceOf(address).call();
+            const decimals = await contract.decimals().call();
+
+            // Convert balance considering decimals
+            const balanceFormatted = balance / Math.pow(10, decimals);
+            return balanceFormatted.toString();
+        } catch (error) {
+            throw new Error(`Failed to get TRC20 balance: ${error.message}`);
         }
     }
 
@@ -245,11 +449,35 @@ class WalletService {
     // Get Bitcoin balance
     static async getBTCBalance(address, chain) {
         const baseUrl = rpcMap[chain];
-        const response = await fetch(`${baseUrl}/address/${address}`);
-        const data = await response.json();
+        const res = await fetch(`${baseUrl}/address/${address}`);
+
+        // If Blockstream returns JSON (normal), parse it. Otherwise handle HTML/plain-text errors.
+        const contentType = res.headers.get('content-type') || '';
+
+        let data;
+        if (contentType.includes('application/json')) {
+            data = await res.json();
+        } else {
+            // Some endpoints return plain text or HTML when address is not found or when using mainnet address
+            // against the testnet endpoint. Read text and try to detect common messages.
+            const text = await res.text();
+
+            // Common Blockstream message when checking mainnet address on testnet: contains 'Address on'
+            if (/Address on/i.test(text) || /not found/i.test(text) || /No such address/i.test(text) || res.status === 404) {
+                // Treat as zero balance rather than crashing the whole process
+                return '0';
+            }
+
+            // If it's HTML (starts with <) return 0 for safety, else raise a clearer error
+            if (text && text.trim().startsWith('<')) {
+                return '0';
+            }
+
+            throw new Error(`Unexpected non-JSON response from ${baseUrl}/address: ${text.slice(0, 200)}`);
+        }
 
         // Convert satoshis to BTC
-        return (data.chain_stats.funded_txo_sum / 100000000).toString();
+        return (data.chain_stats && data.chain_stats.funded_txo_sum ? data.chain_stats.funded_txo_sum / 100000000 : 0).toString();
     }
 
     // Get Solana balance
@@ -262,7 +490,22 @@ class WalletService {
         return (balance / LAMPORTS_PER_SOL).toString();
     }
 
+    // Get Tron balance
+    static async getTRXBalance(address, chain) {
+        const rpcUrl = rpcMap[chain];
+        const tronWeb = this.getTronWeb(rpcUrl);
+
+        try {
+            const balance = await tronWeb.trx.getBalance(address);
+            // Convert sun to TRX (1 TRX = 1,000,000 sun)
+            return (balance / 1000000).toString();
+        } catch (error) {
+            throw new Error(`Failed to get TRX balance: ${error.message}`);
+        }
+    }
+
     // 4. Transfer asset to master wallet (withdrawal simulation)
+    // Enhanced transferToMaster with actual blockchain transfers
     static async transferToMaster(fromWalletId, toMasterAddress, amount, chain, assetId = null) {
         try {
             // Get wallet details
@@ -270,11 +513,25 @@ class WalletService {
             if (!hdWallet) throw new Error('HD Wallet not found');
 
             const addresses = await HDWalletDB.getWalletAddresses(fromWalletId);
-            const fromAddress = addresses.find(addr => parseFloat(addr.balance) >= parseFloat(amount));
+
+            // Find address with sufficient balance
+            let fromAddress;
+            if (assetId) {
+                // For tokens, check token balance
+                fromAddress = addresses.find(addr => parseFloat(addr.token_balance || 0) >= parseFloat(amount));
+            } else {
+                // For native currency, check native balance
+                fromAddress = addresses.find(addr => parseFloat(addr.balance) >= parseFloat(amount));
+            }
 
             if (!fromAddress) {
                 throw new Error('Insufficient balance in wallet addresses');
             }
+
+            // Get private key for signing
+            const seed = await HDWalletDB.getDecryptedSeed(fromWalletId);
+            const seedBuffer = bip39.mnemonicToSeedSync(seed);
+            const privateKey = await this.getPrivateKeyForAddress(seedBuffer, fromAddress.derivation_path, chain);
 
             // Create blockchain transaction record
             const txData = {
@@ -292,74 +549,415 @@ class WalletService {
 
             const transaction = await HDWalletDB.createBlockchainTransaction(txData);
 
-            // Simulate the transfer (in real implementation, you'd broadcast to blockchain)
+            // Execute actual transfer on blockchain
             const walletType = SUPPORTED_WALLETS[chain];
-            let txHash, estimatedGasFee;
+            let txHash, actualGasFee;
 
-            switch (walletType.type) {
-                case 'EVM':
-                    ({ txHash, estimatedGasFee } = await this.simulateEVMTransfer(fromAddress.address, toMasterAddress, amount, chain));
-                    break;
-                case 'BTC':
-                    ({ txHash, estimatedGasFee } = await this.simulateBTCTransfer(fromAddress.address, toMasterAddress, amount, chain));
-                    break;
-                case 'SOL':
-                    ({ txHash, estimatedGasFee } = await this.simulateSOLTransfer(fromAddress.address, toMasterAddress, amount, chain));
-                    break;
-                default:
-                    throw new Error(`Unsupported wallet type: ${walletType.type}`);
+            try {
+                switch (walletType.type) {
+                    case 'EVM':
+                        ({ txHash, actualGasFee } = await this.executeEVMTransfer(
+                            privateKey, fromAddress.address, toMasterAddress, amount, chain, assetId
+                        ));
+                        break;
+                    case 'BTC':
+                        ({ txHash, actualGasFee } = await this.executeBTCTransfer(
+                            privateKey, fromAddress.address, toMasterAddress, amount, chain
+                        ));
+                        break;
+                    case 'SOL':
+                        ({ txHash, actualGasFee } = await this.executeSOLTransfer(
+                            privateKey, fromAddress.address, toMasterAddress, amount, chain
+                        ));
+                        break;
+                    case 'TRX':
+                        ({ txHash, actualGasFee } = await this.executeTRXTransfer(
+                            privateKey, fromAddress.address, toMasterAddress, amount, chain, assetId
+                        ));
+                        break;
+                    default:
+                        throw new Error(`Unsupported wallet type: ${walletType.type}`);
+                }
+
+                // Update transaction as successful
+                await HDWalletDB.updateTransactionStatus(
+                    transaction.id,
+                    'completed',
+                    txHash,
+                    actualGasFee,
+                    new Date()
+                );
+
+                // Update wallet balance (subtract amount + fees)
+                if (assetId) {
+                    // Update token balance
+                    const newTokenBalance = parseFloat(fromAddress.token_balance || 0) - parseFloat(amount);
+                    await HDWalletDB.updateTokenBalance(fromAddress.id, newTokenBalance.toString(), assetId);
+
+                    // Update native balance for gas fees
+                    const newNativeBalance = parseFloat(fromAddress.balance) - parseFloat(actualGasFee);
+                    await HDWalletDB.updateWalletBalance(fromAddress.id, newNativeBalance.toString());
+                } else {
+                    // Update native balance (amount + fees)
+                    const newBalance = parseFloat(fromAddress.balance) - parseFloat(amount) - parseFloat(actualGasFee);
+                    await HDWalletDB.updateWalletBalance(fromAddress.id, newBalance.toString());
+                }
+
+                return {
+                    transactionId: transaction.id,
+                    txHash: txHash,
+                    fromAddress: fromAddress.address,
+                    toAddress: toMasterAddress,
+                    amount: amount,
+                    gasFee: actualGasFee,
+                    status: 'completed',
+                    assetId: assetId,
+                    blockchainUrl: this.getBlockchainExplorerUrl(chain, txHash)
+                };
+
+            } catch (blockchainError) {
+                // Update transaction as failed
+                await HDWalletDB.updateTransactionStatus(
+                    transaction.id,
+                    'failed',
+                    null,
+                    null,
+                    new Date(),
+                    blockchainError.message
+                );
+
+                throw new Error(`Blockchain transfer failed: ${blockchainError.message}`);
             }
 
-            // Update transaction with hash and fee
-            await HDWalletDB.updateTransactionStatus(
-                transaction.id,
-                'processing',
-                txHash,
-                null,
-                new Date()
-            );
-
-            // Update wallet balance (subtract amount + fees)
-            const newBalance = parseFloat(fromAddress.balance) - parseFloat(amount) - parseFloat(estimatedGasFee);
-            await HDWalletDB.updateWalletBalance(fromAddress.id, newBalance.toString());
-
-            return {
-                transactionId: transaction.id,
-                txHash: txHash,
-                fromAddress: fromAddress.address,
-                toAddress: toMasterAddress,
-                amount: amount,
-                gasFee: estimatedGasFee,
-                status: 'processing'
-            };
         } catch (error) {
             throw new Error(`Transfer failed: ${error.message}`);
         }
     }
 
-    // Simulate EVM transfer
-    static async simulateEVMTransfer(fromAddress, toAddress, amount, chain) {
-        // In real implementation, you'd use the private key to sign and send transaction
-        const txHash = '0x' + Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-        const estimatedGasFee = '0.002'; // ETH
+    // Get private key for a specific address
+    static async getPrivateKeyForAddress(seedBuffer, derivationPath, chain) {
+        const walletType = SUPPORTED_WALLETS[chain];
+        const hdNode = bip32.fromSeed(seedBuffer);
+        const child = hdNode.derivePath(derivationPath);
 
-        return { txHash, estimatedGasFee };
+        switch (walletType.type) {
+            case 'EVM':
+            case 'TRX':
+                return child.privateKey;
+            case 'BTC':
+                const network = chain.includes('testnet') ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
+                return child.privateKey;
+            case 'SOL':
+                return child.privateKey.slice(0, 32); // Solana uses 32-byte keys
+            default:
+                throw new Error(`Unsupported wallet type: ${walletType.type}`);
+        }
     }
 
-    // Simulate BTC transfer
-    static async simulateBTCTransfer(fromAddress, toAddress, amount, chain) {
-        const txHash = Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-        const estimatedGasFee = '0.00005'; // BTC
+    // Execute EVM transfer (Ethereum, Polygon, BSC, etc.)
+    static async executeEVMTransfer(privateKey, fromAddress, toAddress, amount, chain, assetId = null) {
+        const rpcUrl = rpcMap[chain];
+        if (!rpcUrl) throw new Error(`RPC URL not found for chain: ${chain}`);
 
-        return { txHash, estimatedGasFee };
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const wallet = new ethers.Wallet(privateKey, provider);
+
+        let tx, receipt;
+
+        try {
+            if (assetId && TOKEN_CONTRACTS[assetId] && TOKEN_CONTRACTS[assetId][chain]) {
+                // Token transfer
+                const contractAddress = TOKEN_CONTRACTS[assetId][chain];
+                const erc20Abi = [
+                    "function transfer(address to, uint256 amount) returns (bool)",
+                    "function decimals() view returns (uint8)"
+                ];
+
+                const contract = new ethers.Contract(contractAddress, erc20Abi, wallet);
+                const decimals = await contract.decimals();
+                const tokenAmount = ethers.parseUnits(amount, decimals);
+
+                // Estimate gas
+                const gasLimit = await contract.transfer.estimateGas(toAddress, tokenAmount);
+                const gasPrice = await provider.getFeeData();
+
+                // Send token transfer transaction
+                tx = await contract.transfer(toAddress, tokenAmount, {
+                    gasLimit: gasLimit,
+                    gasPrice: gasPrice.gasPrice
+                });
+
+            } else {
+                // Native currency transfer
+                const value = ethers.parseEther(amount);
+
+                // Estimate gas
+                const gasLimit = await provider.estimateGas({
+                    to: toAddress,
+                    value: value
+                });
+                const gasPrice = await provider.getFeeData();
+
+                // Send native transfer transaction
+                tx = await wallet.sendTransaction({
+                    to: toAddress,
+                    value: value,
+                    gasLimit: gasLimit,
+                    gasPrice: gasPrice.gasPrice
+                });
+            }
+
+            // Wait for confirmation
+            receipt = await tx.wait();
+
+            if (receipt.status !== 1) {
+                throw new Error(`Transaction failed with status: ${receipt.status}`);
+            }
+
+            // Calculate actual gas fee
+            const actualGasFee = ethers.formatEther(receipt.gasUsed * receipt.gasPrice);
+
+            return {
+                txHash: receipt.hash,
+                actualGasFee: actualGasFee
+            };
+
+        } catch (error) {
+            throw new Error(`EVM transfer failed: ${error.message}`);
+        }
     }
 
-    // Simulate SOL transfer
-    static async simulateSOLTransfer(fromAddress, toAddress, amount, chain) {
-        const txHash = Array(88).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-        const estimatedGasFee = '0.000005'; // SOL
+    // Execute Bitcoin transfer
+    static async executeBTCTransfer(privateKey, fromAddress, toAddress, amount, chain) {
+        const network = chain.includes('testnet') ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
+        const keyPair = bitcoin.ECPair.fromPrivateKey(privateKey, { network });
+        const baseUrl = rpcMap[chain];
 
-        return { txHash, estimatedGasFee };
+        try {
+            // Get UTXOs for the address
+            const utxosResponse = await fetch(`${baseUrl}/address/${fromAddress}/utxo`);
+            const utxos = await utxosResponse.json();
+
+            if (!utxos || utxos.length === 0) {
+                throw new Error('No UTXOs available for spending');
+            }
+
+            // Create transaction
+            const psbt = new bitcoin.Psbt({ network });
+            let totalInput = 0;
+
+            // Add inputs
+            for (const utxo of utxos) {
+                const txHex = await fetch(`${baseUrl}/tx/${utxo.txid}/hex`);
+                const rawTx = await txHex.text();
+
+                psbt.addInput({
+                    hash: utxo.txid,
+                    index: utxo.vout,
+                    nonWitnessUtxo: Buffer.from(rawTx, 'hex')
+                });
+
+                totalInput += utxo.value;
+            }
+
+            const amountSatoshis = Math.floor(parseFloat(amount) * 100000000);
+            const feeRate = 10; // satoshis per byte (adjust based on network conditions)
+            const estimatedFee = 250 * feeRate; // rough estimate
+            const change = totalInput - amountSatoshis - estimatedFee;
+
+            // Add output to recipient
+            psbt.addOutput({
+                address: toAddress,
+                value: amountSatoshis
+            });
+
+            // Add change output if needed
+            if (change > 546) { // dust limit
+                psbt.addOutput({
+                    address: fromAddress,
+                    value: change
+                });
+            }
+
+            // Sign all inputs
+            for (let i = 0; i < utxos.length; i++) {
+                psbt.signInput(i, keyPair);
+            }
+
+            // Finalize and extract transaction
+            psbt.finalizeAllInputs();
+            const tx = psbt.extractTransaction();
+            const txHex = tx.toHex();
+
+            // Broadcast transaction
+            const broadcastResponse = await fetch(`${baseUrl}/tx`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: txHex
+            });
+
+            if (!broadcastResponse.ok) {
+                const errorText = await broadcastResponse.text();
+                throw new Error(`Broadcast failed: ${errorText}`);
+            }
+
+            const txId = await broadcastResponse.text();
+            const actualGasFee = (estimatedFee / 100000000).toString();
+
+            return {
+                txHash: txId,
+                actualGasFee: actualGasFee
+            };
+
+        } catch (error) {
+            throw new Error(`Bitcoin transfer failed: ${error.message}`);
+        }
+    }
+
+    // Execute Solana transfer
+    static async executeSOLTransfer(privateKey, fromAddress, toAddress, amount, chain) {
+        const rpcUrl = rpcMap[chain];
+        const connection = new Connection(rpcUrl);
+
+        try {
+            // Create keypair from private key
+            const fromKeypair = Keypair.fromSecretKey(privateKey);
+            const toPubkey = new PublicKey(toAddress);
+            const lamports = parseFloat(amount) * LAMPORTS_PER_SOL;
+
+            // Create transaction
+            const transaction = new Transaction().add(
+                SystemProgram.transfer({
+                    fromPubkey: fromKeypair.publicKey,
+                    toPubkey: toPubkey,
+                    lamports: lamports
+                })
+            );
+
+            // Get recent blockhash
+            const { blockhash } = await connection.getRecentBlockhash();
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = fromKeypair.publicKey;
+
+            // Sign transaction
+            transaction.sign(fromKeypair);
+
+            // Send transaction
+            const signature = await connection.sendRawTransaction(transaction.serialize());
+
+            // Confirm transaction
+            await connection.confirmTransaction(signature);
+
+            // Get transaction details for fee calculation
+            const txDetails = await connection.getTransaction(signature);
+            const actualGasFee = (txDetails.meta.fee / LAMPORTS_PER_SOL).toString();
+
+            return {
+                txHash: signature,
+                actualGasFee: actualGasFee
+            };
+
+        } catch (error) {
+            throw new Error(`Solana transfer failed: ${error.message}`);
+        }
+    }
+
+    // Execute Tron transfer (TRX and TRC20 tokens)
+    static async executeTRXTransfer(privateKey, fromAddress, toAddress, amount, chain, assetId = null) {
+        const rpcUrl = rpcMap[chain];
+        const tronWeb = this.getTronWeb(rpcUrl, { privateKey: privateKey.toString('hex') });
+
+        try {
+            let tx, result;
+
+            if (assetId && TOKEN_CONTRACTS[assetId] && TOKEN_CONTRACTS[assetId][chain]) {
+                // TRC20 token transfer
+                const contractAddress = TOKEN_CONTRACTS[assetId][chain];
+                const contract = await tronWeb.contract().at(contractAddress);
+                const decimals = await contract.decimals().call();
+                const tokenAmount = parseFloat(amount) * Math.pow(10, decimals);
+
+                // Build token transfer transaction
+                const txObject = await contract.transfer(toAddress, tokenAmount).send({
+                    feeLimit: 100000000, // 100 TRX fee limit
+                    from: fromAddress
+                });
+
+                result = txObject;
+
+            } else {
+                // Native TRX transfer
+                const trxAmount = parseFloat(amount) * 1000000; // Convert TRX to sun
+
+                // Build TRX transfer transaction
+                const txObject = await tronWeb.transactionBuilder.sendTrx(
+                    toAddress,
+                    trxAmount,
+                    fromAddress
+                );
+
+                // Sign transaction
+                const signedTx = await tronWeb.trx.sign(txObject);
+
+                // Broadcast transaction
+                result = await tronWeb.trx.sendRawTransaction(signedTx);
+            }
+
+            if (!result.result || !result.txid) {
+                throw new Error(`Transaction failed: ${JSON.stringify(result)}`);
+            }
+
+            // Wait for confirmation (optional, you might want to implement polling)
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Estimate gas fee (this is approximate for Tron)
+            const actualGasFee = assetId ? '5' : '1.1'; // TRX
+
+            return {
+                txHash: result.txid,
+                actualGasFee: actualGasFee
+            };
+
+        } catch (error) {
+            throw new Error(`Tron transfer failed: ${error.message}`);
+        }
+    }
+
+    // Get blockchain explorer URL
+    static getBlockchainExplorerUrl(chain, txHash) {
+        const explorers = {
+            ethereum: `https://etherscan.io/tx/${txHash}`,
+            sepolia: `https://sepolia.etherscan.io/tx/${txHash}`,
+            polygon: `https://polygonscan.com/tx/${txHash}`,
+            bsc: `https://bscscan.com/tx/${txHash}`,
+            bitcoin: `https://blockstream.info/tx/${txHash}`,
+            bitcoinTestnet: `https://blockstream.info/testnet/tx/${txHash}`,
+            solana: `https://explorer.solana.com/tx/${txHash}`,
+            solanaDevnet: `https://explorer.solana.com/tx/${txHash}?cluster=devnet`,
+            tron: `https://tronscan.org/#/transaction/${txHash}`,
+            tronShasta: `https://shasta.tronscan.org/#/transaction/${txHash}`
+        };
+
+        return explorers[chain] || null;
+    }
+
+    // Enhanced balance check with retry logic
+    static async checkBalanceWithRetry(address, chain, tokenSymbol = null, maxRetries = 3) {
+        let lastError;
+
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                return await this.checkBalance(address, chain, tokenSymbol);
+            } catch (error) {
+                lastError = error;
+                if (i < maxRetries - 1) {
+                    // Wait before retry (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                }
+            }
+        }
+
+        throw lastError;
     }
 
     // Get wallet details
@@ -405,6 +1003,8 @@ class WalletService {
                     // sensible defaults for UI/clients
                     minDeposit: info.minDeposit ?? null,
                     withdrawalFee: info.withdrawalFee ?? null,
+                    // Supported tokens for this chain
+                    supportedTokens: this.getSupportedTokensForChain(key),
                 };
             });
 
@@ -412,6 +1012,39 @@ class WalletService {
         } catch (error) {
             throw new Error(`Failed to get supported chains: ${error.message}`);
         }
+    }
+
+    /**
+     * Get supported tokens for a specific chain
+     * @param {string} chain - The chain identifier
+     * @returns {Array} Array of supported token symbols
+     */
+    static getSupportedTokensForChain(chain) {
+        const tokens = [];
+
+        for (const [tokenSymbol, contracts] of Object.entries(TOKEN_CONTRACTS)) {
+            if (contracts[chain]) {
+                tokens.push({
+                    symbol: tokenSymbol,
+                    contract: contracts[chain],
+                    name: tokenSymbol === 'USDT' ? 'Tether USD' :
+                        tokenSymbol === 'USDC' ? 'USD Coin' : tokenSymbol
+                });
+            }
+        }
+
+        return tokens;
+    }
+
+    /**
+     * Check token balance for a specific wallet address
+     * @param {string} walletAddress - The wallet address
+     * @param {string} chain - The blockchain chain
+     * @param {string} tokenSymbol - Token symbol (e.g., 'USDT')
+     * @returns {Promise<string>} Token balance
+     */
+    static async checkTokenBalance(walletAddress, chain, tokenSymbol) {
+        return await this.checkBalance(walletAddress, chain, tokenSymbol);
     }
 
     /**
@@ -468,366 +1101,15 @@ class WalletService {
         }
     }
 
-    /**
-     * Get all addresses on a specific chain for an account
-     * @param {number} accountId - The account ID
-     * @param {string} chain - The blockchain chain (e.g., 'ethereum', 'bitcoin', 'solana')
-     * @param {Object} options - Additional options
-     * @param {boolean} options.includeEmpty - Include addresses with zero balance (default: true)
-     * @param {string} options.type - Filter by wallet type ('spot', 'futures', etc.)
-     * @param {boolean} options.activeOnly - Only return addresses from active wallets (default: true)
-     * @returns {Promise<Object>} Object containing all addresses on the specified chain
-     */
-    static async getAddressesOnChain(accountId, chain, options = {}) {
-        try {
-            const { includeEmpty = true } = options;
-
-            if (!SUPPORTED_WALLETS[chain]) {
-                throw new Error(`Unsupported chain: ${chain}`);
-            }
-
-            const [hdWallets] = await HDWalletDB.getHDWalletsWithBalances(accountId, chain, options);
-            const walletsWithAddresses = [];
-
-            for (const hdWallet of hdWallets) {
-                const [addresses] = await HDWalletDB.getAddressesForWallet(hdWallet.id, { includeEmpty });
-
-                walletsWithAddresses.push({
-                    hdWalletId: hdWallet.id,
-                    type: hdWallet.type,
-                    totalBalance: parseFloat(hdWallet.total_balance || 0).toFixed(8),
-                    addressCount: addresses.length,
-                    addresses: addresses.map(addr => ({
-                        id: addr.id,
-                        address: addr.address,
-                        addressIndex: addr.address_index,
-                        derivationPath: addr.derivation_path,
-                        balance: addr.balance,
-                        lastSyncAt: addr.last_sync_at,
-                    })),
-                });
-            }
-
-            const allAddresses = walletsWithAddresses.flatMap(w => w.addresses);
-            const totalBalance = allAddresses.reduce((sum, addr) => sum + parseFloat(addr.balance || 0), 0);
-            const activeAddresses = allAddresses.filter(addr => parseFloat(addr.balance) > 0);
-            const chainInfo = SUPPORTED_WALLETS[chain];
-
-            return {
-                accountId,
-                chain,
-                chainType: chainInfo.type,
-                nativeCurrency: chainInfo.nativeCurrency,
-                statistics: {
-                    totalWallets: walletsWithAddresses.length,
-                    totalAddresses: allAddresses.length,
-                    activeAddresses: activeAddresses.length,
-                    emptyAddresses: allAddresses.length - activeAddresses.length,
-                    totalBalance: totalBalance.toFixed(8),
-                    currency: chainInfo.nativeCurrency,
-                },
-                wallets: walletsWithAddresses,
-                addresses: allAddresses.sort((a, b) => {
-                    const balanceDiff = parseFloat(b.balance) - parseFloat(a.balance);
-                    return balanceDiff !== 0 ? balanceDiff : a.addressIndex - b.addressIndex;
-                }),
-            };
-        } catch (error) {
-            throw new Error(`Failed to get addresses on chain: ${error.message}`);
-        }
-    }
-    // static async getAddressesOnChain(accountId, chain, options = {}) {
-    //     try {
-    //         const {
-    //             includeEmpty = true,
-    //             type = null,
-    //             activeOnly = true
-    //         } = options;
-
-    //         // Validate chain
-    //         if (!SUPPORTED_WALLETS[chain]) {
-    //             throw new Error(`Unsupported chain: ${chain}`);
-    //         }
-
-    //         // Build query for HD wallets
-    //         let query = `
-    //     SELECT hw.*,
-    //            COUNT(wa.id) as address_count,
-    //            SUM(CAST(wa.balance AS DECIMAL(20,8))) as total_balance
-    //     FROM hd_wallets hw
-    //     LEFT JOIN wallet_addresses wa ON hw.id = wa.hd_wallet_id
-    //     WHERE hw.account_id = ? AND hw.chain = ?
-    //   `;
-
-    //         const queryParams = [accountId, chain];
-
-    //         if (activeOnly) {
-    //             query += ' AND hw.is_active = 1';
-    //         }
-
-    //         if (type) {
-    //             query += ' AND hw.type = ?';
-    //             queryParams.push(type);
-    //         }
-
-    //         query += ' GROUP BY hw.id';
-
-    //         const [hdWallets] = await pool.execute(query, queryParams);
-
-    //         // Get all addresses for each HD wallet
-    //         const walletsWithAddresses = [];
-
-    //         for (const hdWallet of hdWallets) {
-    //             // Get addresses for this HD wallet
-    //             let addressQuery = `
-    //       SELECT * FROM wallet_addresses
-    //       WHERE hd_wallet_id = ?
-    //     `;
-
-    //             const addressParams = [hdWallet.id];
-
-    //             if (!includeEmpty) {
-    //                 addressQuery += ' AND balance > 0';
-    //             }
-
-    //             addressQuery += ' ORDER BY address_index';
-
-    //             const [addresses] = await pool.execute(addressQuery, addressParams);
-
-    //             walletsWithAddresses.push({
-    //                 hdWalletId: hdWallet.id,
-    //                 type: hdWallet.type,
-    //                 totalBalance: parseFloat(hdWallet.total_balance || 0).toFixed(8),
-    //                 addressCount: addresses.length,
-    //                 addresses: addresses.map(addr => ({
-    //                     id: addr.id,
-    //                     address: addr.address,
-    //                     addressIndex: addr.address_index,
-    //                     derivationPath: addr.derivation_path,
-    //                     balance: addr.balance,
-    //                     lastSyncAt: addr.last_sync_at
-    //                 }))
-    //             });
-    //         }
-
-    //         // Aggregate statistics
-    //         const allAddresses = walletsWithAddresses.flatMap(w => w.addresses);
-    //         const totalBalance = allAddresses.reduce((sum, addr) => {
-    //             return sum + parseFloat(addr.balance || 0);
-    //         }, 0);
-
-    //         const activeAddresses = allAddresses.filter(addr => parseFloat(addr.balance) > 0);
-
-    //         // Get chain info
-    //         const chainInfo = SUPPORTED_WALLETS[chain];
-
-    //         return {
-    //             accountId: accountId,
-    //             chain: chain,
-    //             chainType: chainInfo.type,
-    //             nativeCurrency: chainInfo.nativeCurrency,
-    //             statistics: {
-    //                 totalWallets: walletsWithAddresses.length,
-    //                 totalAddresses: allAddresses.length,
-    //                 activeAddresses: activeAddresses.length,
-    //                 emptyAddresses: allAddresses.length - activeAddresses.length,
-    //                 totalBalance: totalBalance.toFixed(8),
-    //                 currency: chainInfo.nativeCurrency
-    //             },
-    //             wallets: walletsWithAddresses,
-    //             addresses: allAddresses.sort((a, b) => {
-    //                 // Sort by balance (highest first), then by address index
-    //                 const balanceDiff = parseFloat(b.balance) - parseFloat(a.balance);
-    //                 return balanceDiff !== 0 ? balanceDiff : a.addressIndex - b.addressIndex;
-    //             })
-    //         };
-    //     } catch (error) {
-    //         throw new Error(`Failed to get addresses on chain: ${error.message}`);
-    //     }
-    // }
-
-    /**
-     * Get address balance summary across all chains for an account
-     * @param {number} accountId - The account ID
-     * @returns {Promise<Object>} Summary of all addresses across all chains
-     */
-    static async getAddressSummaryAllChains(accountId) {
-        try {
-            const [results] = await HDWalletDB.getAddressSummaryAllChains(accountId);
-            const chainSummary = {};
-
-            for (const row of results) {
-                if (!chainSummary[row.chain]) {
-                    const chainInfo = SUPPORTED_WALLETS[row.chain] || {};
-                    chainSummary[row.chain] = {
-                        chain: row.chain,
-                        chainType: chainInfo.type,
-                        nativeCurrency: chainInfo.nativeCurrency,
-                        wallets: [],
-                        totalBalance: 0,
-                        totalAddresses: 0,
-                        activeAddresses: 0,
-                    };
-                }
-
-                chainSummary[row.chain].wallets.push({
-                    type: row.type,
-                    walletCount: parseInt(row.wallet_count),
-                    addressCount: parseInt(row.address_count),
-                    activeAddresses: parseInt(row.active_addresses),
-                    balance: parseFloat(row.total_balance || 0).toFixed(8),
-                });
-
-                chainSummary[row.chain].totalBalance += parseFloat(row.total_balance || 0);
-                chainSummary[row.chain].totalAddresses += parseInt(row.address_count);
-                chainSummary[row.chain].activeAddresses += parseInt(row.active_addresses);
-            }
-
-            const chains = Object.values(chainSummary).map(chain => ({
-                ...chain,
-                totalBalance: chain.totalBalance.toFixed(8),
-            }));
-
-            return {
-                accountId,
-                summary: {
-                    totalChains: chains.length,
-                    totalWallets: chains.reduce((sum, c) =>
-                        sum + c.wallets.reduce((s, w) => s + w.walletCount, 0), 0),
-                    totalAddresses: chains.reduce((sum, c) => sum + c.totalAddresses, 0),
-                    totalActiveAddresses: chains.reduce((sum, c) => sum + c.activeAddresses, 0),
-                },
-                chains,
-            };
-        } catch (error) {
-            throw new Error(`Failed to get address summary: ${error.message}`);
-        }
-    }
-    // static async getAddressSummaryAllChains(accountId) {
-    //     try {
-    //         const query = `
-    //     SELECT
-    //       hw.chain,
-    //       hw.type,
-    //       COUNT(DISTINCT hw.id) as wallet_count,
-    //       COUNT(wa.id) as address_count,
-    //       SUM(CAST(wa.balance AS DECIMAL(20,8))) as total_balance,
-    //       COUNT(CASE WHEN wa.balance > 0 THEN 1 END) as active_addresses
-    //     FROM hd_wallets hw
-    //     LEFT JOIN wallet_addresses wa ON hw.id = wa.hd_wallet_id
-    //     WHERE hw.account_id = ? AND hw.is_active = 1
-    //     GROUP BY hw.chain, hw.type
-    //     ORDER BY hw.chain, hw.type
-    //   `;
-
-    //         const [results] = await pool.execute(query, [accountId]);
-
-    //         // Group by chain
-    //         const chainSummary = {};
-
-    //         for (const row of results) {
-    //             if (!chainSummary[row.chain]) {
-    //                 const chainInfo = SUPPORTED_WALLETS[row.chain] || {};
-    //                 chainSummary[row.chain] = {
-    //                     chain: row.chain,
-    //                     chainType: chainInfo.type,
-    //                     nativeCurrency: chainInfo.nativeCurrency,
-    //                     wallets: [],
-    //                     totalBalance: 0,
-    //                     totalAddresses: 0,
-    //                     activeAddresses: 0
-    //                 };
-    //             }
-
-    //             chainSummary[row.chain].wallets.push({
-    //                 type: row.type,
-    //                 walletCount: parseInt(row.wallet_count),
-    //                 addressCount: parseInt(row.address_count),
-    //                 activeAddresses: parseInt(row.active_addresses),
-    //                 balance: parseFloat(row.total_balance || 0).toFixed(8)
-    //             });
-
-    //             chainSummary[row.chain].totalBalance += parseFloat(row.total_balance || 0);
-    //             chainSummary[row.chain].totalAddresses += parseInt(row.address_count);
-    //             chainSummary[row.chain].activeAddresses += parseInt(row.active_addresses);
-    //         }
-
-    //         // Format final response
-    //         const chains = Object.values(chainSummary).map(chain => ({
-    //             ...chain,
-    //             totalBalance: chain.totalBalance.toFixed(8)
-    //         }));
-
-    //         return {
-    //             accountId: accountId,
-    //             summary: {
-    //                 totalChains: chains.length,
-    //                 totalWallets: chains.reduce((sum, c) =>
-    //                     sum + c.wallets.reduce((s, w) => s + w.walletCount, 0), 0),
-    //                 totalAddresses: chains.reduce((sum, c) => sum + c.totalAddresses, 0),
-    //                 totalActiveAddresses: chains.reduce((sum, c) => sum + c.activeAddresses, 0)
-    //             },
-    //             chains: chains
-    //         };
-    //     } catch (error) {
-    //         throw new Error(`Failed to get address summary: ${error.message}`);
-    //     }
-    // }
-
-    /**
-     * Sync all addresses balances for an HD wallet
-     * @param {number} hdWalletId - The HD wallet ID
-     * @returns {Promise<Object>} Updated wallet info with fresh balances
-     */
-    static async syncHDWalletBalances(hdWalletId) {
-        try {
-            const hdWallet = await HDWalletDB.getHDWallet(hdWalletId);
-            if (!hdWallet) {
-                throw new Error('HD Wallet not found');
-            }
-
-            const addresses = await HDWalletDB.getWalletAddresses(hdWalletId);
-            const updatedAddresses = [];
-
-            for (const address of addresses) {
-                try {
-                    const balance = await this.checkBalance(address.address, hdWallet.chain);
-                    updatedAddresses.push({
-                        address: address.address,
-                        oldBalance: address.balance,
-                        newBalance: balance,
-                        updated: balance !== address.balance
-                    });
-                } catch (error) {
-                    console.error(`Failed to sync balance for ${address.address}:`, error);
-                    updatedAddresses.push({
-                        address: address.address,
-                        error: error.message
-                    });
-                }
-            }
-
-            return {
-                walletId: hdWalletId,
-                chain: hdWallet.chain,
-                syncedAt: new Date(),
-                addressCount: addresses.length,
-                updatedCount: updatedAddresses.filter(a => a.updated).length,
-                addresses: updatedAddresses
-            };
-        } catch (error) {
-            throw new Error(`Failed to sync HD wallet balances: ${error.message}`);
-        }
-    }
-
     // Static getter for supported wallets
     static get SUPPORTED_WALLETS() {
         return SUPPORTED_WALLETS;
     }
 }
 
-// Export both the class and the SUPPORTED_WALLETS constant
+// Export both the class and helpers
 module.exports = WalletService;
 module.exports.SUPPORTED_WALLETS = SUPPORTED_WALLETS;
 module.exports.derivationPaths = derivationPaths;
 module.exports.rpcMap = rpcMap;
+module.exports.TOKEN_CONTRACTS = TOKEN_CONTRACTS;

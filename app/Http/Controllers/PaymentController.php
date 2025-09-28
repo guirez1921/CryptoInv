@@ -110,7 +110,7 @@ class PaymentController extends Controller
         }
 
         // Otherwise, instruct BlockchainService to create one
-        $hdWallet = $account->wallets()->where('chain', $chain)->first();
+        $hdWallet = $account->wallets()->first();
         if (!$hdWallet) {
             Log::info('[PaymentController@getOrCreateDepositAddress] creating hdWallet via BlockchainService', ['account_id' => $accountId, 'chain' => $chain]);
             try {
@@ -145,20 +145,20 @@ class PaymentController extends Controller
             return response()->json(['error' => 'Failed to create address', 'detail' => $e->getMessage()], 500);
         }
 
-        if (is_array($result) && !empty($result['address'])) {
-            $address = $result['address'];
-            // Persist address into WalletAddress or HdWallet addresses relationship
-            $hdWallet->addresses()->create([
-                'address' => $address,
-                'is_used' => false,
-                'address_index' => $hdWallet->address_index + 1,
-            ]);
-            // bump address index
-            $hdWallet->incrementAddressIndex(1);
+        $address = $result['address'];
+        // if (is_array($result) && !empty($result['address'])) {
+        //     // Persist address into WalletAddress or HdWallet addresses relationship
+        //     $hdWallet->addresses()->create([
+        //         'address' => $address,
+        //         'is_used' => false,
+        //         'address_index' => $hdWallet->address_index + 1,
+        //     ]);
+        //     // bump address index
+        // }
+        $hdWallet->incrementAddressIndex(1);
 
-            Log::info('[PaymentController@getOrCreateDepositAddress] address persisted', ['hdWalletId' => $hdWallet->id, 'address' => $address]);
-            return response()->json(['success' => true, 'depositAddress' => $address]);
-        }
+        Log::info('[PaymentController@getOrCreateDepositAddress] address persisted', ['hdWalletId' => $hdWallet->id, 'address' => $address]);
+        return response()->json(['success' => true, 'depositAddress' => $address]);
 
         Log::error('[PaymentController@getOrCreateDepositAddress] address creation failed', ['hdWalletId' => $hdWallet->id ?? null, 'result' => $result]);
         return response()->json(['error' => 'Address creation failed', 'result' => $result], 500);

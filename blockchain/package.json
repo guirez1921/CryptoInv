@@ -5,9 +5,12 @@
 		"bip39": "^3.1.0",
 		"bitcoinjs-lib": "^6.1.7",
 		"crypto": "^1.0.1",
+		"dotenv": "^16.6.1",
 		"ethers": "^6.15.0",
 		"mysql2": "^3.15.1",
 		"node-cron": "^4.2.1",
-		"pusher": "^5.2.0"
+		"pusher": "^5.2.0",
+		"tiny-secp256k1": "^2.2.4",
+		"tronweb": "^6.0.4"
 	}
 }

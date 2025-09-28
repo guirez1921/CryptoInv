@@ -1,5 +1,12 @@
+// Ensure we load the Laravel .env so the blockchain JS uses the same environment variables.
+// try {
+//   require('./env').loadEnv();
+// } catch (e) {
+//   // not fatal
+// }
 const WalletService = require('./service');
 const startBalanceCron = require('./cron');
+const DB = require('./database');
 
 (async () => {
   const [, , fn, ...args] = process.argv;
@@ -9,7 +16,11 @@ const startBalanceCron = require('./cron');
 
     switch (fn) {
       case 'createHDWallet':
-        result = await WalletService.createHDWallet(args[0], args[1], args[2]);
+        result = await WalletService.createHDWallet(
+          args[0],
+          args[1],
+          args[2]
+        );
         break;
 
       case 'createAddress':
@@ -87,9 +98,34 @@ const startBalanceCron = require('./cron');
         throw new Error(`Unknown function: ${fn}`);
     }
 
+    // Close DB pool to allow the process to exit cleanly
+    try {
+      if (DB && typeof DB.closePool === 'function') {
+        await DB.closePool();
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // Print the result after DB shutdown so there are no open DB sockets keeping Node alive
     console.log(JSON.stringify(result));
+
+    // Final small delay to let stdout/stderr flush, then exit
+    setTimeout(() => process.exit(0), 50);
   } catch (err) {
-    console.error(err.message);
+    // Print full stack to help debugging from the PHP side
+    if (err && err.stack) {
+      console.error(err.stack);
+    } else {
+      console.error(err ? err.toString() : 'Unknown error');
+    }
+    try {
+      if (DB && typeof DB.closePool === 'function') {
+        await DB.closePool();
+      }
+    } catch (e) {
+      // ignore
+    }
     process.exit(1);
   }
 })();

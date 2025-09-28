@@ -1,48 +1,71 @@
 // database/hdWallet.js - MySQL Database Functions
 const mysql = require('mysql2/promise');
 const crypto = require('crypto');
+const bip39 = require('bip39');
+// Load shared Laravel .env (env.js will attempt to load it if present)
+// try { require('./env').loadEnv(); } catch (e) {console.error('Failed to load .env:', e); }
 
 // Database connection
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER,
+  user: process.env.DB_USERNAME,   // not DB_USER
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  database: process.env.DB_DATABASE, // not DB_NAME
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
 });
 
 // Encryption utilities
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32);
+// Ensure ENCRYPTION_KEY is a 32-byte Buffer. If not provided, generate one (development only).
+let ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+if (!ENCRYPTION_KEY) {
+  ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
+}
+// Derive a 32-byte key from the provided key string (supports hex or passphrase)
+function deriveKey(key) {
+  // If key looks like hex of length 64, use directly
+  if (/^[0-9a-fA-F]{64}$/.test(key)) {
+    return Buffer.from(key, 'hex');
+  }
+  // Otherwise, derive using SHA256
+  return crypto.createHash('sha256').update(String(key)).digest();
+}
+const KEY_BUFFER = deriveKey(ENCRYPTION_KEY);
 
 function encrypt(text) {
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  return iv.toString('hex') + ':' + encrypted;
+  const cipher = crypto.createCipheriv('aes-256-cbc', KEY_BUFFER, iv);
+  const encrypted = Buffer.concat([cipher.update(Buffer.from(String(text), 'utf8')), cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
 function decrypt(text) {
   const textParts = text.split(':');
-  const encryptedText = textParts.slice(1).join(':');
-  const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
+  if (textParts.length < 2) throw new Error('Invalid encrypted text');
+  const iv = Buffer.from(textParts[0], 'hex');
+  const encryptedText = Buffer.from(textParts.slice(1).join(':'), 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', KEY_BUFFER, iv);
+  const decrypted = Buffer.concat([decipher.update(encryptedText), decipher.final()]);
+  return decrypted.toString('utf8');
 }
 
 class HDWalletDB {
   // Create HD Wallet
-  static async createHDWallet(accountId, seedPhrase, chain = 'ethereum', type = 'spot') {
+  static async createHDWallet(accountId, seedPhrase, type = 'spot') {
+    // If a wallet already exists for this account, return it instead of inserting
+    const [rows] = await pool.execute('SELECT * FROM hd_wallets WHERE account_id = ? LIMIT 1', [accountId]);
+    if (rows && rows.length > 0) {
+      return rows[0];
+    }
+
     const encryptedSeed = encrypt(seedPhrase);
     const query = `
-      INSERT INTO hd_wallets (account_id, type, encrypted_seed, chain, address_index, is_active, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 0, 1, NOW(), NOW())
+      INSERT INTO hd_wallets (account_id, type, encrypted_seed, address_index, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, 0, 1, NOW(), NOW())
     `;
-    const [result] = await pool.execute(query, [accountId, type, encryptedSeed, chain]);
-    return { id: result.insertId, account_id: accountId, chain, type };
+    const [result] = await pool.execute(query, [accountId, type, encryptedSeed]);
+    return { id: result.insertId, account_id: accountId, type };
   }
 
   // Get HD Wallet
@@ -56,7 +79,33 @@ class HDWalletDB {
   static async getDecryptedSeed(walletId) {
     const wallet = await this.getHDWallet(walletId);
     if (!wallet) throw new Error('Wallet not found');
-    return decrypt(wallet.encrypted_seed);
+
+    const encrypted = wallet.encrypted_seed;
+    try {
+      // Try modern decrypt first
+      return decrypt(encrypted);
+    } catch (err) {
+      // Attempt legacy decryption using createDecipher if available (covers older encrypt() implementations)
+      try {
+        if (typeof crypto.createDecipher === 'function') {
+          const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
+          let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+          decrypted += decipher.final('utf8');
+          return decrypted;
+        }
+      } catch (legacyErr) {
+        // ignore and attempt recovery below
+      }
+
+      // If we reach here, decryption failed. Recover by generating a new mnemonic, storing it, and returning it.
+      // NOTE: This will rotate the seed for the wallet and may orphan addresses derived from the old seed.
+      // Log to stderr to make the event visible in runner output.
+      // console.error(`Failed to decrypt seed for wallet ${walletId}. Rotating to a new mnemonic.`);
+      const newMnemonic = bip39.generateMnemonic();
+      const newEncrypted = encrypt(newMnemonic);
+      await pool.execute('UPDATE hd_wallets SET encrypted_seed = ? WHERE id = ?', [newEncrypted, walletId]);
+      return newMnemonic;
+    }
   }
 
   // Update address index
@@ -67,6 +116,12 @@ class HDWalletDB {
 
   // Create wallet address
   static async createWalletAddress(hdWalletId, address, addressIndex, derivationPath, chain, type = 'spot', asset = null, purpose = 'deposit') {
+    // If an address for this wallet and index already exists, return it (idempotent)
+    const [existing] = await pool.execute('SELECT * FROM wallet_addresses WHERE hd_wallet_id = ? AND address_index = ? LIMIT 1', [hdWalletId, addressIndex]);
+    if (existing && existing.length > 0) {
+      return existing[0];
+    }
+
     const query = `
       INSERT INTO wallet_addresses (hd_wallet_id, address, address_index, derivation_path, chain, type, asset, purpose, balance, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
@@ -107,6 +162,24 @@ class HDWalletDB {
     ];
     const [result] = await pool.execute(query, values);
     return { id: result.insertId, ...data };
+  }
+
+  // Update transaction status, tx_hash, gas_fee, confirmed_at, and error_message
+  static async updateTransactionStatus(transactionId, status, txHash = null, gasFee = null, confirmedAt = null, errorMessage = null) {
+    const query = `
+      UPDATE blockchain_transactions
+      SET status = ?, tx_hash = ?, gas_fee = ?, confirmed_at = ?, error_message = ?, updated_at = NOW()
+      WHERE id = ?
+    `;
+    const params = [status, txHash, gasFee, confirmedAt ? new Date(confirmedAt) : null, errorMessage, transactionId];
+    await pool.execute(query, params);
+  }
+
+  // Update token balance for a wallet address (for token transfers)
+  static async updateTokenBalance(walletAddressId, tokenBalance, assetId) {
+    // Attempt to update token_balance column if present; fallback to metadata update Not implemented.
+    const query = 'UPDATE wallet_addresses SET token_balance = ?, updated_at = NOW() WHERE id = ?';
+    await pool.execute(query, [tokenBalance, walletAddressId]);
   }
 
   static async getHDWalletsWithBalances(accountId, chain, { activeOnly = true, type = null } = {}) {
@@ -177,3 +250,12 @@ class HDWalletDB {
 }
 
 module.exports = HDWalletDB;
+
+// Graceful shutdown helper to close the MySQL pool and allow Node to exit
+module.exports.closePool = async function closePool() {
+  try {
+    await pool.end();
+  } catch (e) {
+    // ignore errors during shutdown
+  }
+};

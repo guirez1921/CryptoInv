@@ -38,7 +38,14 @@ class Account extends Model
 
     public function getDepositAddress(string $chain): ?string
     {
-        $wallet = $this->wallets()->where('chain', $chain)->first();
-        return $wallet ? $wallet->address : null;
+        $hdWallet = $this->wallets()->first();
+        if (!$hdWallet) {
+            return null;
+        }
+
+        // addresses() is a HasMany relation; ->addresses returns a Collection.
+        // Return the first address record's `address` value if present.
+        $firstAddress = $hdWallet->addresses()->where('chain', $chain)->first();
+        return $firstAddress ? $firstAddress->address : null;
     }
 }

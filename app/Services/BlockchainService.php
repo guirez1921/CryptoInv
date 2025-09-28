@@ -22,19 +22,63 @@ class BlockchainService
      */
     protected function runNode(string $fn, array $args = [])
     {
-        // Build command and log it
-        $command = array_merge(['node', $this->runnerPath, $fn], $args);
-        $commandString = implode(' ', array_map(function ($c) { return is_string($c) ? $c : json_encode($c); }, $command));
-        Log::info('[BlockchainService] runNode starting', ['function' => $fn, 'args' => $args, 'command' => $commandString]);
+        // Build base node command: include Node's --no-warnings flag and pass a script-level --no-warning flag
+        // --no-warnings (plural) is a Node runtime flag that suppresses deprecation warnings.
+        // --no-warning (singular) is passed to the script as an argument in case runner.js checks it.
+        $command = ['node', '--no-warnings', $this->runnerPath, $fn, ...$args, '--no-warning'];
 
-        $process = new Process($command);
+        // Collect required environment variables from the real environment (do NOT read Laravel config())
+        $keys = [
+            'DB_CONNECTION',
+            'DB_HOST',
+            'DB_PORT',
+            'DB_DATABASE',
+            'DB_USERNAME',
+            'DB_PASSWORD',
+            'ENCRYPTION_KEY',
+            'REVERB_APP_ID',
+            'REVERB_APP_KEY',
+            'REVERB_APP_SECRET',
+            'REVERB_HOST',
+            'REVERB_PORT',
+            'REVERB_SCHEME'
+        ];
+
+        $env = [];
+        foreach ($keys as $k) {
+            $val = getenv($k);
+            if ($val === false && function_exists('env')) {
+                // env() reads from environment as well and is available in Laravel
+                $val = env($k);
+            }
+            if (($val === null || $val === false || $val === '') && isset($_ENV[$k])) {
+                $val = $_ENV[$k];
+            }
+            if ($val !== null && $val !== false && $val !== '') {
+                $env[$k] = (string)$val;
+            }
+        }
+
+        // We use the Node runtime flag --no-warnings instead of an environment variable.
+
+        $commandString = implode(' ', $command);
+        Log::info('[BlockchainService] runNode starting', [
+            'function' => $fn,
+            'args' => $args,
+            'command' => $commandString,
+            'env' => $env
+        ]);
+
+        // Use Process with array-style command and explicit env (avoids shell-embedded env assignments)
+        // Pass the env array we built so the Node process sees the same environment values
+        $process = new Process($command, base_path(), $env);
 
         $start = microtime(true);
         $process->run();
-        $duration = round((microtime(true) - $start) * 1000, 2); // ms
+        $duration = round((microtime(true) - $start) * 1000, 2);
 
         $output = $process->getOutput();
-        $errorOutput = method_exists($process, 'getErrorOutput') ? $process->getErrorOutput() : null;
+        $errorOutput = $process->getErrorOutput();
 
         Log::debug('[BlockchainService] runNode finished', [
             'function' => $fn,
@@ -52,18 +96,13 @@ class BlockchainService
                 'output' => $output,
                 'errorOutput' => $errorOutput,
             ]);
-
             throw new ProcessFailedException($process);
         }
 
-        // Attempt to decode JSON, fallback to raw output
         $decoded = json_decode($output, true);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            return $decoded;
-        }
-
-        return $output;
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : $output;
     }
+
 
     // --- Wrapper methods ---
 
@@ -165,5 +204,4 @@ class BlockchainService
         Log::debug('[BlockchainService] syncHDWalletBalances result', ['result' => $res]);
         return $res;
     }
-
 }

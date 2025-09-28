@@ -48,6 +48,7 @@ const PaymentIndex = () => {
         const res = await fetch(route('settings.getMinWithdrawal'));
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        console.log(data);
         const val = data.min_withdrawal ?? data.minWithdrawal ?? data.min ?? 50000;
         if (mounted) setMinimumWithdrawal(Number(val));
       } catch (err) {
@@ -94,6 +95,7 @@ const PaymentIndex = () => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log(data);
         setSupportedChains(data.chains || []);
         if (data.chains && data.chains.length > 0) {
           setSelectedChain(data.chains[0].key);
@@ -150,10 +152,12 @@ const PaymentIndex = () => {
       });
       
       if (response.ok) {
+        console.log(response);
         const data = await response.json();
         if (data.success) {
           setDepositAddress(data.depositAddress);
           setAddressGenerated(true);
+          console.log(data);
         }
       }
     } catch (error) {

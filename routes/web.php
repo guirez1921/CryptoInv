@@ -81,8 +81,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings/min-withdrawal', [SettingsController::class, 'updateMinWithdrawal'])->name('settings.updateMinWithdrawal');
     Route::get('/settings/min-withdrawal', [SettingsController::class, 'getMinWithdrawal'])->name('settings.getMinWithdrawal');
 
-    
+
 
 });
+
+// Endpoint to receive client-side error reports from the browser
+Route::post('/client-errors', [\App\Http\Controllers\ClientErrorController::class, 'store']);
 
 require __DIR__ . '/auth.php';

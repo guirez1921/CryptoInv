@@ -89,10 +89,11 @@ const Dashboard = ({
 
   // Handle minimum withdrawal update
   const handleMinWithdrawalUpdate = async () => {
+    console.log('Selected minimum withdrawal:', selectedMinWithdrawal);
     if (!selectedMinWithdrawal) return;
 
     setIsUpdating(true);
-    
+
     try {
       router.post(route('settings.updateMinWithdrawal'), {
         min_withdrawal: selectedMinWithdrawal
@@ -101,6 +102,7 @@ const Dashboard = ({
           // update local value and close modal
           setMinWithdrawalValue(selectedMinWithdrawal);
           setShowMinWithdrawalModal(false);
+          console.log('Minimum withdrawal updated successfully.');
           // You might want to show a success message here
         },
         onError: (errors) => {
@@ -253,7 +255,7 @@ const Dashboard = ({
                     <h2 className="text-xl font-bold text-white">Market Overview</h2>
                     <BarChart3 className="w-5 h-5 text-gray-400" />
                   </div>
-                  
+
                   {/* Market Metrics */}
                   <div className="grid grid-cols-3 gap-4 mb-6">
                     <div className="p-4 rounded-lg bg-gray-700/30">
@@ -272,7 +274,7 @@ const Dashboard = ({
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="p-4 rounded-lg bg-gray-700/30">
                       <p className="text-sm text-gray-400">Fear & Greed</p>
                       <p className={`text-lg font-bold ${getFearGreedColor(marketData.fearGreedIndex?.value || 50)}`}>
@@ -282,22 +284,22 @@ const Dashboard = ({
                         {marketData.fearGreedIndex?.classification || 'Neutral'}
                       </p>
                     </div>
-                    
+
                     <div className="p-4 rounded-lg bg-gray-700/30">
                       <p className="text-sm text-gray-400">Avg RSI</p>
                       <p className={`text-lg font-bold ${getRSIColor(marketData.averageRSI || 50)}`}>
                         {(marketData.averageRSI || 50).toFixed(1)}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {marketData.averageRSI >= 70 ? 'Overbought' : 
-                         marketData.averageRSI >= 50 ? 'Bullish' : 
-                         marketData.averageRSI >= 30 ? 'Bearish' : 'Oversold'}
+                        {marketData.averageRSI >= 70 ? 'Overbought' :
+                          marketData.averageRSI >= 50 ? 'Bullish' :
+                            marketData.averageRSI >= 30 ? 'Bearish' : 'Oversold'}
                       </p>
                     </div>
                   </div>
                 </Card>
               </div>
-              
+
               {/* Cryptocurrency List */}
               <div>
                 <Card>
@@ -305,7 +307,7 @@ const Dashboard = ({
                     <h2 className="text-xl font-bold text-white">Top Cryptocurrencies</h2>
                     <Button variant="ghost" size="sm">View All</Button>
                   </div>
-                  
+
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
@@ -325,8 +327,8 @@ const Dashboard = ({
                               <td className="py-4 text-gray-400">{crypto.market_cap_rank || index + 1}</td>
                               <td className="py-4">
                                 <div className="flex items-center space-x-3">
-                                  <img 
-                                    src={crypto.logo} 
+                                  <img
+                                    src={crypto.logo}
                                     alt={crypto.name}
                                     className="w-8 h-8 rounded-full"
                                     onError={(e) => {
@@ -439,10 +441,9 @@ const Dashboard = ({
                     recentTransactions.slice(0, 5).map((tx, idx) => (
                       <div key={idx} className="flex items-center justify-between py-2">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            tx.status_badge === 'deposit' ? 'bg-blue-500/20' : 
-                            tx.status_badge === 'withdrawal' ? 'bg-orange-500/20' : 'bg-green-500/20'
-                          }`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${tx.status_badge === 'deposit' ? 'bg-blue-500/20' :
+                              tx.status_badge === 'withdrawal' ? 'bg-orange-500/20' : 'bg-green-500/20'
+                            }`}>
                             {tx.status_badge === 'deposit' && <ArrowDownRight className="w-3 h-3 text-blue-400" />}
                             {tx.status_badge === 'withdrawal' && <ArrowUpRight className="w-3 h-3 text-orange-400" />}
                             {tx.status_badge === 'trade' && <TrendingUp className="w-3 h-3 text-green-400" />}
@@ -480,22 +481,21 @@ const Dashboard = ({
                     <X className="w-6 h-6" />
                   </button>
                 </div>
-                
+
                 <div className="p-6">
                   <p className="text-gray-300 mb-6">
                     Please select your minimum withdrawal amount to proceed with transactions.
                   </p>
-                  
+
                   <div className="grid grid-cols-2 gap-3 mb-6">
                     {withdrawalOptions.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => setSelectedMinWithdrawal(option.value)}
-                        className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                          selectedMinWithdrawal === option.value
+                        className={`p-4 rounded-lg border-2 transition-all duration-200 ${selectedMinWithdrawal === option.value
                             ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
                             : 'border-gray-600 bg-gray-700/50 text-gray-300 hover:border-gray-500'
-                        }`}
+                          }`}
                         disabled={isUpdating}
                       >
                         <div className="text-lg font-semibold">{option.label}</div>
@@ -503,7 +503,7 @@ const Dashboard = ({
                       </button>
                     ))}
                   </div>
-                  
+
                   <div className="flex space-x-3">
                     <Button
                       onClick={() => setShowMinWithdrawalModal(false)}

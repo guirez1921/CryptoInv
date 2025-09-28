@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class SettingsController extends Controller
@@ -15,7 +16,8 @@ class SettingsController extends Controller
     public function getMinWithdrawal()
     {
         $user = Auth::user();
-        
+        Log::info('[Settings] getMinWithdrawal', ['userId' => $user->id ?? null, 'accountId' => $user->account->id ?? null, 'ip' => request()->ip(), 'min_withdrawal' => $user->account->min_withdrawal ?? 0]);
+
         return response()->json([
             'min_withdrawal' => $user->account->min_withdrawal ?? 0
         ]);
@@ -31,17 +33,22 @@ class SettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::warning('[Settings] updateMinWithdrawal validation failed', ['userId' => Auth::id(), 'errors' => $validator->errors()->all(), 'input' => $request->all()]);
             return redirect()->back()->withErrors($validator)->with('error', 'Invalid minimum withdrawal amount selected.');
         }
 
         try {
             $user = Auth::user();
+            $old = $user->account->min_withdrawal ?? null;
             $user->account->min_withdrawal = $request->min_withdrawal;
-            $user->save();
+            $user->account->save();
+
+            Log::info('[Settings] updateMinWithdrawal', ['userId' => $user->id, 'accountId' => $user->account->id ?? null, 'old' => $old, 'new' => $request->min_withdrawal, 'ip' => request()->ip()]);
 
             return redirect()->back()->with('success', 'Minimum withdrawal amount updated successfully.');
             
         } catch (\Exception $e) {
+            Log::error('[Settings] updateMinWithdrawal failed', ['userId' => Auth::id(), 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Failed to update minimum withdrawal amount. Please try again.');
         }
     }
@@ -52,7 +59,8 @@ class SettingsController extends Controller
     public function index()
     {
         $user = Auth::user();
-        
+        Log::info('[Settings] index', ['userId' => $user->id ?? null, 'accountId' => $user->account->id ?? null, 'ip' => request()->ip()]);
+
         return Inertia::render('Settings/Index', [
             'user' => $user,
             'minWithdrawal' => $user->account->min_withdrawal ?? 0,
@@ -80,17 +88,22 @@ class SettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::warning('[Settings] update validation failed', ['userId' => Auth::id(), 'errors' => $validator->errors()->all(), 'input' => $request->all()]);
             return redirect()->back()->withErrors($validator);
         }
 
         try {
             $user = Auth::user();
-            $user->fill($request->only(['name', 'email', 'phone', 'country', 'timezone']));
+            $data = $request->only(['name', 'email', 'phone', 'country', 'timezone']);
+            $user->fill($data);
             $user->save();
+
+            Log::info('[Settings] update', ['userId' => $user->id, 'accountId' => $user->account->id ?? null, 'updated' => $data, 'ip' => request()->ip()]);
 
             return redirect()->back()->with('success', 'Settings updated successfully.');
             
         } catch (\Exception $e) {
+            Log::error('[Settings] update failed', ['userId' => Auth::id(), 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Failed to update settings. Please try again.');
         }
     }
@@ -110,12 +123,13 @@ class SettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::warning('[Settings] updateNotifications validation failed', ['userId' => Auth::id(), 'errors' => $validator->errors()->all(), 'input' => $request->all()]);
             return redirect()->back()->withErrors($validator);
         }
 
         try {
             $user = Auth::user();
-            $user->notification_settings = $request->only([
+            $payload = $request->only([
                 'email_notifications',
                 'sms_notifications', 
                 'push_notifications',
@@ -123,11 +137,15 @@ class SettingsController extends Controller
                 'transaction_alerts',
                 'price_alerts'
             ]);
+            $user->notification_settings = $payload;
             $user->save();
+
+            Log::info('[Settings] updateNotifications', ['userId' => $user->id, 'accountId' => $user->account->id ?? null, 'payload' => $payload, 'ip' => request()->ip()]);
 
             return redirect()->back()->with('success', 'Notification settings updated successfully.');
             
         } catch (\Exception $e) {
+            Log::error('[Settings] updateNotifications failed', ['userId' => Auth::id(), 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Failed to update notification settings. Please try again.');
         }
     }
@@ -141,10 +159,12 @@ class SettingsController extends Controller
             $user = Auth::user();
             $user->account->min_withdrawal = 0;
             $user->save();
+            Log::info('[Settings] resetMinWithdrawal', ['userId' => $user->id, 'accountId' => $user->account->id ?? null, 'ip' => request()->ip()]);
 
             return redirect()->back()->with('success', 'Minimum withdrawal reset successfully.');
             
         } catch (\Exception $e) {
+            Log::error('[Settings] resetMinWithdrawal failed', ['userId' => Auth::id(), 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Failed to reset minimum withdrawal. Please try again.');
         }
     }

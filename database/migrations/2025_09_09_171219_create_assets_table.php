@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('assets', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('blockchain_network_id')->constrained('blockchain_networks');
+            // $table->foreignId('blockchain_network_id')->constrained('blockchain_networks');
             $table->string('name');
             $table->string('abv_name');
             $table->string('icon');
