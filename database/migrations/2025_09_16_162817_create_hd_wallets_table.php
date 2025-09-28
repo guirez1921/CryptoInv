@@ -26,7 +26,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['account_id']);
-            $table->unique(['account_id', 'encrypted_seed']);
+            $table->unique(['account_id']);
         });
     }
 
