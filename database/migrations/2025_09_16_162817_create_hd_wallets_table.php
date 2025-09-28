@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('account_id')->constrained()->onDelete('cascade');
             $table->enum('type', ['spot', 'trading', 'savings'])->default('spot');
             $table->text('encrypted_seed'); // Encrypted mnemonic seed
-            // $table->string('chain')->default('ethereum');
             $table->unsignedInteger('address_index')->default(0); // Highest derived index
             $table->boolean('is_active')->default(true);
             $table->timestamp('verified_at')->nullable();

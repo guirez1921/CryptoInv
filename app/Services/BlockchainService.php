@@ -71,7 +71,7 @@ class BlockchainService
 
         // Use Process with array-style command and explicit env (avoids shell-embedded env assignments)
         // Pass the env array we built so the Node process sees the same environment values
-        $process = new Process($command, base_path(), $env);
+        $process = new Process($command, base_path(), array_merge($_ENV, $_SERVER, $env));
 
         $start = microtime(true);
         $process->run();
