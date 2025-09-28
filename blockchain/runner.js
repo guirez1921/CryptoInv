@@ -7,6 +7,8 @@
 const WalletService = require('./service');
 const startBalanceCron = require('./cron');
 const DB = require('./database');
+const dotenv = require('dotenv');
+dotenv.config(); // Load .env file if present
 
 (async () => {
   const [, , fn, ...args] = process.argv;
@@ -24,10 +26,17 @@ const DB = require('./database');
         break;
 
       case 'createAddress':
+        // Sanitize index argument: parse to int and treat invalid numbers as null
+        let addrIndex = null;
+        if (typeof args[2] !== 'undefined' && args[2] !== null) {
+          const parsed = Number.parseInt(args[2], 10);
+          addrIndex = Number.isFinite(parsed) ? parsed : null;
+        }
+
         result = await WalletService.createAddress(
           args[0], // hdWalletId
           args[1], // chain
-          args[2] ? parseInt(args[2]) : null
+          addrIndex
         );
         break;
 

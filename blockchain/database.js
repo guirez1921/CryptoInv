@@ -2,6 +2,8 @@
 const mysql = require('mysql2/promise');
 const crypto = require('crypto');
 const bip39 = require('bip39');
+const dotenv = require('dotenv');
+dotenv.config(); // Load .env file if present
 // Load shared Laravel .env (env.js will attempt to load it if present)
 // try { require('./env').loadEnv(); } catch (e) {console.error('Failed to load .env:', e); }
 

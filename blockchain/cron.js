@@ -5,6 +5,8 @@
 const cron = require("node-cron");
 const WalletService = require("./service");
 const { broadcast } = require("./broadcast");
+const dotenv = require('dotenv');
+dotenv.config(); // Load .env file if present
 
 async function startBalanceCron(address, chain) {
   let runCount = 0;

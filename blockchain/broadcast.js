@@ -2,6 +2,8 @@
 // try { require('./env').loadEnv(); } catch (e) { /* ignore */ }
 
 const Pusher = require('pusher');
+const dotenv = require('dotenv');
+dotenv.config(); // Load .env file if present
 // const log = (lvl, msg, meta = {}) => console.log(JSON.stringify({ lvl, msg, ...meta }));
 
 const REVERB_APP_ID = process.env.REVERB_APP_ID || null;

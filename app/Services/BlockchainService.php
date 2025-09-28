@@ -20,58 +20,22 @@ class BlockchainService
     /**
      * Run a Node function via runner.js
      */
+    // 
+
     protected function runNode(string $fn, array $args = [])
     {
-        // Build base node command: include Node's --no-warnings flag and pass a script-level --no-warning flag
-        // --no-warnings (plural) is a Node runtime flag that suppresses deprecation warnings.
-        // --no-warning (singular) is passed to the script as an argument in case runner.js checks it.
+        // Build base node command
         $command = ['node', '--no-warnings', $this->runnerPath, $fn, ...$args, '--no-warning'];
-
-        // Collect required environment variables from the real environment (do NOT read Laravel config())
-        $keys = [
-            'DB_CONNECTION',
-            'DB_HOST',
-            'DB_PORT',
-            'DB_DATABASE',
-            'DB_USERNAME',
-            'DB_PASSWORD',
-            'ENCRYPTION_KEY',
-            'REVERB_APP_ID',
-            'REVERB_APP_KEY',
-            'REVERB_APP_SECRET',
-            'REVERB_HOST',
-            'REVERB_PORT',
-            'REVERB_SCHEME'
-        ];
-
-        $env = [];
-        foreach ($keys as $k) {
-            $val = getenv($k);
-            if ($val === false && function_exists('env')) {
-                // env() reads from environment as well and is available in Laravel
-                $val = env($k);
-            }
-            if (($val === null || $val === false || $val === '') && isset($_ENV[$k])) {
-                $val = $_ENV[$k];
-            }
-            if ($val !== null && $val !== false && $val !== '') {
-                $env[$k] = (string)$val;
-            }
-        }
-
-        // We use the Node runtime flag --no-warnings instead of an environment variable.
 
         $commandString = implode(' ', $command);
         Log::info('[BlockchainService] runNode starting', [
             'function' => $fn,
             'args' => $args,
             'command' => $commandString,
-            'env' => $env
         ]);
 
-        // Use Process with array-style command and explicit env (avoids shell-embedded env assignments)
-        // Pass the env array we built so the Node process sees the same environment values
-        $process = new Process($command, base_path(), array_merge($_ENV, $_SERVER, $env));
+        // Just run with inherited environment
+        $process = new Process($command, base_path());
 
         $start = microtime(true);
         $process->run();
@@ -102,7 +66,6 @@ class BlockchainService
         $decoded = json_decode($output, true);
         return json_last_error() === JSON_ERROR_NONE ? $decoded : $output;
     }
-
 
     // --- Wrapper methods ---
 

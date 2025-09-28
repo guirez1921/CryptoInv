@@ -12,6 +12,8 @@ const { BIP32Factory } = require('bip32');
 const ecc = require('tiny-secp256k1');
 const bip32 = BIP32Factory(ecc);
 const HDWalletDB = require('./database');
+const dotenv = require('dotenv');
+dotenv.config(); // Load .env file if present
 
 // You'll need to install tronweb: npm install tronweb
 const TronWeb = require('tronweb');
@@ -152,8 +154,21 @@ class WalletService {
             const seed = await HDWalletDB.getDecryptedSeed(hdWalletId);
             const seedBuffer = bip39.mnemonicToSeedSync(seed);
 
-            // Use provided index or increment from current
-            const index = addressIndex !== null ? addressIndex : hdWallet.address_index + 1;
+            // Use provided index or increment from current. Validate to avoid NaN in derivation paths.
+            let index;
+            if (addressIndex !== null) {
+                index = Number(addressIndex);
+                if (!Number.isFinite(index) || Number.isNaN(index)) {
+                    throw new Error(`Invalid address index: ${addressIndex}`);
+                }
+            } else {
+                const currentIndex = Number(hdWallet.address_index);
+                if (!Number.isFinite(currentIndex) || Number.isNaN(currentIndex)) {
+                    index = 0;
+                } else {
+                    index = currentIndex + 1;
+                }
+            }
 
             let address, derivationPath;
             const walletType = SUPPORTED_WALLETS[chain];
