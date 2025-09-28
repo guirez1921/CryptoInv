@@ -25,7 +25,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['account_id', 'encrypted_seed']);
+            $table->index(['account_id']);
             $table->unique(['account_id', 'encrypted_seed']);
         });
     }
