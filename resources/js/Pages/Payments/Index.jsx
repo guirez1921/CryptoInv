@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ArrowDownRight, 
-  ArrowUpRight, 
-  Copy, 
-  QrCode, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Copy,
+  QrCode,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
   X,
   Wallet,
   TrendingUp,
@@ -34,6 +34,7 @@ const PaymentIndex = () => {
   const [copied, setCopied] = useState(false);
   const [addressGenerated, setAddressGenerated] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [open, setOpen] = useState(false);
 
   // Get data from props
   const availableBalance = account?.balance || 0;
@@ -92,7 +93,7 @@ const PaymentIndex = () => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log(data);
@@ -142,7 +143,7 @@ const PaymentIndex = () => {
 
   const generateDepositAddress = async () => {
     if (!accountId || !selectedChain) return;
-    
+
     setLoading(true);
     try {
       const response = await fetch(route('payments.getDepositAddress', { chain: selectedChain }), {
@@ -150,7 +151,7 @@ const PaymentIndex = () => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         console.log(response);
         const data = await response.json();
@@ -176,14 +177,14 @@ const PaymentIndex = () => {
 
   const handleDeposit = async (e) => {
     e.preventDefault();
-    
+
     if (!amount || !selectedChain) {
       alert('Please fill in all required fields');
       return;
     }
 
     setLoading(true);
-    
+
     try {
       router.post('/payments/deposit', {
         amount: parseFloat(amount),
@@ -222,14 +223,14 @@ const PaymentIndex = () => {
 
   const handleWithdrawal = async (e) => {
     e.preventDefault();
-    
+
     if (!canWithdraw) {
       alert(`Minimum withdrawal amount is $${minimumWithdrawal}`);
       return;
     }
 
     const withdrawAmountFloat = parseFloat(withdrawAmount);
-    
+
     if (withdrawAmountFloat > availableBalance) {
       alert('Insufficient balance');
       return;
@@ -243,7 +244,7 @@ const PaymentIndex = () => {
     }
 
     setLoading(true);
-    
+
     try {
       router.post('/payments/withdraw', {
         amount: withdrawAmountFloat,
@@ -304,7 +305,7 @@ const PaymentIndex = () => {
 
   const formatTransactionData = (transactions) => {
     if (!transactions || !transactions.data) return [];
-    
+
     return transactions.data.map(tx => ({
       id: tx.id,
       type: tx.type,
@@ -397,22 +398,20 @@ const PaymentIndex = () => {
           <div className="flex space-x-1 mb-8 bg-gray-800 rounded-lg p-1">
             <button
               onClick={() => setActiveTab('deposit')}
-              className={`flex-1 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'deposit'
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
+              className={`flex-1 px-4 py-3 rounded-md text-sm font-medium transition-colors ${activeTab === 'deposit'
+                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                : 'text-gray-400 hover:text-white'
+                }`}
             >
               <ArrowDownRight className="w-4 h-4 mr-2 inline" />
               Deposit
             </button>
             <button
               onClick={() => setActiveTab('withdrawal')}
-              className={`flex-1 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'withdrawal'
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
+              className={`flex-1 px-4 py-3 rounded-md text-sm font-medium transition-colors ${activeTab === 'withdrawal'
+                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                : 'text-gray-400 hover:text-white'
+                }`}
             >
               <ArrowUpRight className="w-4 h-4 mr-2 inline" />
               Withdraw
@@ -632,7 +631,7 @@ const PaymentIndex = () => {
                     placeholder="Enter amount"
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
-                    <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-gray-400 mt-1">
                     Available: ${availableBalance.toFixed(2)} | Minimum: ${minimumWithdrawal}
                   </p>
                 </div>
@@ -675,9 +674,8 @@ const PaymentIndex = () => {
                       <tr key={tx.id} className="border-b border-gray-800 hover:bg-gray-700/20">
                         <td className="py-4">
                           <div className="flex items-center">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                              tx.type === 'deposit' ? 'bg-green-500/20' : 'bg-orange-500/20'
-                            }`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${tx.type === 'deposit' ? 'bg-green-500/20' : 'bg-orange-500/20'
+                              }`}>
                               {tx.type === 'deposit' ? (
                                 <TrendingDown className="w-4 h-4 text-green-400" />
                               ) : (

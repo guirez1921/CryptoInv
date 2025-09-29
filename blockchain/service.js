@@ -1,22 +1,15 @@
-// Load shared Laravel .env
-// try { require('./env').loadEnv(); } catch (e) { }
-
-// services/walletService.js - Enhanced version with Tron and USDT support
 const { ethers } = require('ethers');
 const bitcoin = require('bitcoinjs-lib');
 const { Connection, PublicKey, LAMPORTS_PER_SOL, Keypair, Transaction, SystemProgram } = require('@solana/web3.js');
 const crypto = require('crypto');
 const bip39 = require('bip39');
-// bip32 v5 exports a factory; create an instance with tiny-secp256k1
 const { BIP32Factory } = require('bip32');
 const ecc = require('tiny-secp256k1');
 const bip32 = BIP32Factory(ecc);
 const HDWalletDB = require('./database');
+const TronWeb = require('tronweb');
 const dotenv = require('dotenv');
 dotenv.config(); // Load .env file if present
-
-// You'll need to install tronweb: npm install tronweb
-const TronWeb = require('tronweb');
 
 const rpcMap = {
     // Ethereum and EVM chains
@@ -62,54 +55,51 @@ const TOKEN_CONTRACTS = {
 
 const SUPPORTED_WALLETS = {
     // EVM chains
-    ethereum: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    sepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    polygon: { type: 'EVM', coinType: 60, nativeCurrency: 'MATIC' },
-    polygonAmoy: { type: 'EVM', coinType: 60, nativeCurrency: 'MATIC' },
-    base: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    baseSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    avalanche: { type: 'EVM', coinType: 60, nativeCurrency: 'AVAX' },
-    avalancheFuji: { type: 'EVM', coinType: 60, nativeCurrency: 'AVAX' },
-    optimism: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    optimismSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    arbitrum: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    arbitrumSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    bsc: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB' },
-    bscTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB' },
-    linea: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    lineaSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    blast: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    blastSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    palm: { type: 'EVM', coinType: 60, nativeCurrency: 'PALM' },
-    palmTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'PALM' },
-    starknet: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    starknetSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    celo: { type: 'EVM', coinType: 60, nativeCurrency: 'CELO' },
-    celoAlfajores: { type: 'EVM', coinType: 60, nativeCurrency: 'CELO' },
-    zksync: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    zksyncSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    mantle: { type: 'EVM', coinType: 60, nativeCurrency: 'MNT' },
-    mantleSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'MNT' },
-    opbnb: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB' },
-    opbnbTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB' },
-    scroll: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    scrollSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    sei: { type: 'EVM', coinType: 60, nativeCurrency: 'SEI' },
-    seiTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'SEI' },
-    swellchain: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    swellchainTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    unichain: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    unichainSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH' },
-    // Bitcoin
-    bitcoin: { type: 'BTC', coinType: 0, nativeCurrency: 'BTC' },
-    bitcoinTestnet: { type: 'BTC', coinType: 1, nativeCurrency: 'BTC' },
-    // Solana
-    solana: { type: 'SOL', coinType: 501, nativeCurrency: 'SOL' },
-    solanaDevnet: { type: 'SOL', coinType: 501, nativeCurrency: 'SOL' },
-    // Tron
-    tron: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX' },
-    tronShasta: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX' },
-    tronNile: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX' },
+    ethereum: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    solana: { type: 'SOL', coinType: 501, nativeCurrency: 'SOL', icon: '' },
+    bitcoin: { type: 'BTC', coinType: 0, nativeCurrency: 'BTC', icon: '' },
+    tron: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX', icon: '' },
+    polygon: { type: 'EVM', coinType: 60, nativeCurrency: 'MATIC', icon: '' },
+    base: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    avalanche: { type: 'EVM', coinType: 60, nativeCurrency: 'AVAX', icon: '' },
+    optimism: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    arbitrum: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    bsc: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB', icon: '' },
+    linea: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    blast: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    palm: { type: 'EVM', coinType: 60, nativeCurrency: 'PALM', icon: '' },
+    starknet: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    celo: { type: 'EVM', coinType: 60, nativeCurrency: 'CELO', icon: '' },
+    zksync: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    mantle: { type: 'EVM', coinType: 60, nativeCurrency: 'MNT', icon: '' },
+    opbnb: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB', icon: '' },
+    scroll: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    sei: { type: 'EVM', coinType: 60, nativeCurrency: 'SEI', icon: '' },
+    swellchain: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    unichain: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    sepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    polygonAmoy: { type: 'EVM', coinType: 60, nativeCurrency: 'MATIC', icon: '' },
+    baseSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    avalancheFuji: { type: 'EVM', coinType: 60, nativeCurrency: 'AVAX', icon: '' },
+    optimismSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    arbitrumSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    bscTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB', icon: '' },
+    lineaSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    blastSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    palmTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'PALM', icon: '' },
+    starknetSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    celoAlfajores: { type: 'EVM', coinType: 60, nativeCurrency: 'CELO', icon: '' },
+    zksyncSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    mantleSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'MNT', icon: '' },
+    opbnbTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB', icon: '' },
+    scrollSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    seiTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'SEI', icon: '' },
+    swellchainTestnet: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    unichainSepolia: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
+    bitcoinTestnet: { type: 'BTC', coinType: 1, nativeCurrency: 'BTC', icon: '' },
+    solanaDevnet: { type: 'SOL', coinType: 501, nativeCurrency: 'SOL', icon: '' },
+    tronShasta: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX', icon: '' },
+    tronNile: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX', icon: '' },
 };
 
 class WalletService {
