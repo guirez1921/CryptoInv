@@ -7,7 +7,6 @@ console.log(import.meta.env.VITE_REVERB_HOST);
 window.Echo = new Echo({
     broadcaster: 'reverb',
     key: import.meta.env.VITE_REVERB_APP_KEY,
-    // wsHost: window.location.hostname,
     enabledTransports: ['ws'],
     wsHost: import.meta.env.VITE_REVERB_HOST,
     wsPort: import.meta.env.VITE_REVERB_PORT ?? 80,
