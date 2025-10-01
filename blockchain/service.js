@@ -137,7 +137,11 @@ class WalletService {
             if (existingAddresses && existingAddresses.length > 0) {
                 const existingForChain = existingAddresses.find(a => a.chain === chain);
                 if (existingForChain) {
-                    return existingForChain;
+                    return {
+                        id: existingForChain.id,
+                        address: existingForChain.address,
+                        addressIndex: existingForChain.address_index
+                    };
                 }
             }
 

@@ -36,7 +36,7 @@ class Account extends Model
         return $this->hasMany(BlockchainTransaction::class);
     }
 
-    public function getDepositAddress(string $chain): ?string
+    public function getDepositAddress(string $chain): ?WalletAddress
     {
         $hdWallet = $this->wallets()->first();
         if (!$hdWallet) {
@@ -46,6 +46,6 @@ class Account extends Model
         // addresses() is a HasMany relation; ->addresses returns a Collection.
         // Return the first address record's `address` value if present.
         $firstAddress = $hdWallet->addresses()->where('chain', $chain)->first();
-        return $firstAddress ? $firstAddress->address : null;
+        return $firstAddress;
     }
 }

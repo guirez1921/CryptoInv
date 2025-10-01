@@ -8,10 +8,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Deposit extends Model
 {
     protected $fillable = [
-        'user_id', 'asset_id', 'blockchain_transaction_id',
-        'deposit_address', 'amount', 'network_fee', 'status',
-        'transaction_hash', 'confirmations', 'required_confirmations',
-        'confirmed_at', 'notes', 'metadata',
+        'user_id',
+        'asset_id',
+        'blockchain_transaction_id',
+        'deposit_address',
+        'amount',
+        'network_fee',
+        'status',
+        'transaction_hash',
+        'confirmations',
+        'required_confirmations',
+        'confirmed_at',
+        'notes',
+        'metadata',
+        'chain',
+        'wallet_address_id',
     ];
 
     protected $casts = [

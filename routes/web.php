@@ -15,6 +15,10 @@ Route::get('/', function () {
     return Inertia::render('Home');
 })->name("home");
 
+Route::get('/about', function () {
+    return Inertia::render('About');
+})->name("about");
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
@@ -80,9 +84,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/min-withdrawal', [SettingsController::class, 'updateMinWithdrawal'])->name('settings.updateMinWithdrawal');
     Route::get('/settings/min-withdrawal', [SettingsController::class, 'getMinWithdrawal'])->name('settings.getMinWithdrawal');
-
-
-
 });
 
 // Endpoint to receive client-side error reports from the browser

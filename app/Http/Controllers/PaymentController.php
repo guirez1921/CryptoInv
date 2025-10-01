@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
 use App\Services\BlockchainService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use App\Models\HdWallet;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
@@ -23,10 +26,10 @@ class PaymentController extends Controller
         $userId = $user?->id;
         Log::info('[PaymentController@index] rendering payments index', ['user_id' => $userId]);
 
-        $history = $user->paymentHistoryQuery()->paginate(10);
+        $history = $this->paymentHistoryQuery()->paginate(10);
 
-        $total_deposits = $user->deposits()->sum('amount');
-        $total_withdrawals = $user->withdrawals()->sum('amount');
+        $total_deposits = $user->deposits()->where('status', 'completed')->sum('amount');
+        $total_withdrawals = $user->withdrawals()->where('status', 'completed')->sum('amount');
         $pending_withdrawals = $user->withdrawals()->where('status', 'pending')->sum('amount');
         $pending_deposits = $user->deposits()->where('status', 'pending')->sum('amount');
 
@@ -61,7 +64,7 @@ class PaymentController extends Controller
         $userId = $user?->id;
         Log::info('[PaymentController@history] fetching history', ['user_id' => $userId]);
 
-        $history = $user->paymentHistoryQuery()->paginate(10);
+        $history = $this->paymentHistoryQuery()->paginate(10);
 
         Log::debug('[PaymentController@history] returning history', ['user_id' => $userId, 'count' => $history->count()]);
         return response()->json($history);
@@ -103,7 +106,7 @@ class PaymentController extends Controller
         }
 
         // If account already has an address for this chain, return it
-        $existing = $account->getDepositAddress($chain);
+        $existing = $account->getDepositAddress($chain)->address;
         if ($existing) {
             Log::info('[PaymentController@getOrCreateDepositAddress] existing address found', ['account_id' => $accountId, 'chain' => $chain]);
             return response()->json(['success' => true, 'depositAddress' => $existing]);
@@ -200,17 +203,29 @@ class PaymentController extends Controller
         $user = $request->user();
         $userId = $user?->id;
         $accountId = $user->account?->id;
+        $asset = Asset::where('abv_name', $request->chain)->first();
+        $chain = $request['chain'];
+        $wallet = $user->account->getDepositAddress($chain);
+        $amount = $request['amount'];
+        if (! $asset) {
+            Log::warning('[PaymentController@deposit] invalid_chain', ['user_id' => $userId, 'chain' => $request->chain]);
+            return redirect()->route('payments.index')->with('error', 'Invalid chain selected for deposit.');
+        }
+
         Log::info('[PaymentController@deposit] start', ['user_id' => $userId, 'account_id' => $accountId, 'amount' => $request->amount, 'chain' => $request->chain]);
 
         $deposit = $user->deposits()->create([
-            'amount' => $request->amount,
+            'amount' => $amount,
             'status' => 'pending',
+            'asset_id' => $asset->id,
+            'chain' => $chain,
+            'wallet_address_id' => $wallet->id ?? null,
         ]);
+        $deposit->save();
 
         Log::debug('[PaymentController@deposit] deposit_created', ['user_id' => $userId, 'deposit_id' => $deposit->id ?? null]);
 
-        $chain = $request['chain'];
-        $address = $user->account->getDepositAddress($chain);
+        $address = $wallet ? $wallet->address : null;
         if (! $address) {
             Log::warning('[PaymentController@deposit] no_deposit_address', ['user_id' => $userId, 'chain' => $chain]);
             return redirect()->route('payments.index')->with('error', 'No deposit address found for the selected chain.');
@@ -238,11 +253,11 @@ class PaymentController extends Controller
         Log::info('[PaymentController@withdraw] start', ['user_id' => $userId, 'account_id' => $accountId, 'amount' => $request->amount]);
 
         // Set withdrawal quota
-        $withdrawalQuota = 20000;
+        $withdrawalQuota = $account->min_withdrawal ?? 50000;
 
         if ($request->amount > $withdrawalQuota) {
             Log::warning('[PaymentController@withdraw] exceeds_quota', ['user_id' => $userId, 'amount' => $request->amount, 'quota' => $withdrawalQuota]);
-            return redirect()->route('payments.index')->with('error', 'Withdrawal amount exceeds the quota of $20,000.');
+            return redirect()->route('payments.index')->with('error', 'Withdrawal amount exceeds the quota of $' . number_format($withdrawalQuota));
         }
 
         if ($request->amount > $account->balance) {
@@ -260,5 +275,50 @@ class PaymentController extends Controller
         Log::info('[PaymentController@withdraw] withdrawal_created', ['user_id' => $userId, 'withdrawal_id' => $withdrawal->id ?? null, 'new_balance' => $account->balance]);
 
         return redirect()->route('payments.index')->with('success', 'Withdrawal request submitted successfully.');
+    }
+
+    private function paymentHistoryQuery()
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return null;
+        }
+        
+        // Get closed trades (profit/loss)
+        $trades = $user->trades()
+            ->where('status', 'closed')
+            ->selectRaw('
+                id as reference_id,
+                CASE WHEN profit_loss >= 0 THEN "profit" ELSE "loss" END as type,
+                profit_loss as amount,
+                COALESCE(closed_at, updated_at) as date,
+                "trade" as source
+            ');
+
+        // Get deposits
+        $deposits = $user->deposits()
+            ->selectRaw('
+                id as reference_id,
+                "deposit" as type,
+                amount,
+                created_at as date,
+                "deposit" as source
+            ');
+
+        // Get withdrawals
+        $withdrawals = $user->withdrawals()
+            ->selectRaw('
+                id as reference_id,
+                "withdrawal" as type,
+                amount,
+                created_at as date,
+                "withdrawal" as source
+            ');
+
+        // Union all queries
+        $query = $trades->unionAll($deposits)->unionAll($withdrawals);
+
+        // Return as a query builder so you can paginate
+        return DB::query()->fromSub($query, 'payment_history')->orderByDesc('date');
     }
 }

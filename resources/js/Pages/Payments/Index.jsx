@@ -62,6 +62,24 @@ const PaymentIndex = () => {
   }, []);
 
   useEffect(() => {
+    // Try to hydrate from localStorage first so the UI appears immediately,
+    // then fetch the latest data from the server to refresh it.
+    try {
+      const saved = localStorage.getItem('supportedChains');
+      const savedSelected = localStorage.getItem('selectedChain');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setSupportedChains(parsed || []);
+        if (parsed && parsed.length > 0) {
+          const key = savedSelected || parsed[0].key;
+          setSelectedChain(key);
+          setWithdrawChain(key);
+        }
+      }
+    } catch (err) {
+      console.error('Error reading supportedChains from localStorage', err);
+    }
+
     fetchSupportedChains();
   }, []);
 
@@ -97,10 +115,27 @@ const PaymentIndex = () => {
       if (response.ok) {
         const data = await response.json();
         console.log(data);
-        setSupportedChains(data.chains || []);
-        if (data.chains && data.chains.length > 0) {
-          setSelectedChain(data.chains[0].key);
-          setWithdrawChain(data.chains[0].key);
+        const chains = data.chains || [];
+        setSupportedChains(chains);
+        try {
+          // persist the fetched list and selection so subsequent page loads are instant
+          localStorage.setItem('supportedChains', JSON.stringify(chains));
+        } catch (err) {
+          console.error('Error writing supportedChains to localStorage', err);
+        }
+        if (chains && chains.length > 0) {
+          // prefer an existing selectedChain in localStorage if present
+          try {
+            const savedSelected = localStorage.getItem('selectedChain');
+            const selectedKey = savedSelected || chains[0].key;
+            setSelectedChain(selectedKey);
+            setWithdrawChain(selectedKey);
+            localStorage.setItem('selectedChain', selectedKey);
+          } catch (err) {
+            console.error('Error handling selectedChain localStorage', err);
+            setSelectedChain(chains[0].key);
+            setWithdrawChain(chains[0].key);
+          }
         }
       }
     } catch (error) {
@@ -135,6 +170,12 @@ const PaymentIndex = () => {
         }
       ];
       setSupportedChains(mockChains);
+      try {
+        localStorage.setItem('supportedChains', JSON.stringify(mockChains));
+        localStorage.setItem('selectedChain', mockChains[0].key);
+      } catch (err) {
+        // ignore localStorage failures
+      }
       setSelectedChain(mockChains[0].key);
       setWithdrawChain(mockChains[0].key);
     }
@@ -351,7 +392,7 @@ const PaymentIndex = () => {
                 <div>
                   <p className="text-sm text-gray-400">Total Deposits</p>
                   <p className="text-2xl font-bold text-green-400">
-                    ${totals?.deposits?.toLocaleString() || '0.00'}
+                    ${totals && typeof totals.deposits !== 'undefined' ? Number(totals.deposits).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
                   </p>
                 </div>
                 <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600">
@@ -365,7 +406,7 @@ const PaymentIndex = () => {
                 <div>
                   <p className="text-sm text-gray-400">Total Withdrawals</p>
                   <p className="text-2xl font-bold text-orange-400">
-                    ${totals?.withdrawals?.toLocaleString() || '0.00'}
+                    ${totals && typeof totals.withdrawals !== 'undefined' ? Number(totals.withdrawals).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
                   </p>
                 </div>
                 <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-gradient-to-r from-orange-500 to-red-600">
@@ -379,7 +420,7 @@ const PaymentIndex = () => {
                 <div>
                   <p className="text-sm text-gray-400">Minimum Withdrawal</p>
                   <p className="text-2xl font-bold text-white">
-                    ${minimumWithdrawal.toLocaleString()}
+                    ${Number(minimumWithdrawal).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-gradient-to-r from-purple-500 to-pink-600">
@@ -446,9 +487,11 @@ const PaymentIndex = () => {
                   <select
                     value={selectedChain}
                     onChange={(e) => {
-                      setSelectedChain(e.target.value);
+                      const val = e.target.value;
+                      setSelectedChain(val);
                       setAddressGenerated(false);
                       setDepositAddress('');
+                      try { localStorage.setItem('selectedChain', val); } catch (err) { }
                     }}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
@@ -476,8 +519,8 @@ const PaymentIndex = () => {
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
                   {getSelectedChainData() && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Minimum deposit: ${getSelectedChainData().minDeposit || 10}
+                      <p className="text-xs text-gray-400 mt-1">
+                      Minimum deposit: ${Number(getSelectedChainData().minDeposit || 10).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   )}
                 </div>
@@ -585,7 +628,11 @@ const PaymentIndex = () => {
                   </label>
                   <select
                     value={withdrawChain}
-                    onChange={(e) => setWithdrawChain(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setWithdrawChain(val);
+                      try { localStorage.setItem('selectedChain', val); } catch (err) { }
+                    }}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
                     <option value="">Select a chain</option>
@@ -595,9 +642,12 @@ const PaymentIndex = () => {
                       </option>
                     ))}
                   </select>
+                  
+                  {/* persist withdraw chain selection */}
+                  {/* NOTE: we attach an onChange above; to persist we handle it below by reading withdrawChain change elsewhere */}
                   {getWithdrawChainData() && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Withdrawal fee: {getWithdrawChainData().withdrawalFee} {getWithdrawChainData().symbol}
+                      <p className="text-xs text-gray-400 mt-1">
+                      Withdrawal fee: {getWithdrawChainData() && typeof getWithdrawChainData().withdrawalFee !== 'undefined' ? Number(getWithdrawChainData().withdrawalFee).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} {getWithdrawChainData()?.symbol}
                     </p>
                   )}
                 </div>
@@ -632,7 +682,7 @@ const PaymentIndex = () => {
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
                   <p className="text-xs text-gray-400 mt-1">
-                    Available: ${availableBalance.toFixed(2)} | Minimum: ${minimumWithdrawal}
+                    Available: ${Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Minimum: ${Number(minimumWithdrawal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
 

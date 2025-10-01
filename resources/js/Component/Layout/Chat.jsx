@@ -126,7 +126,8 @@ const FloatingChat = ({ auth, adminUser = null, initialMessages = [] }) => {
           'X-Requested-With': 'XMLHttpRequest',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ message: tempMessage.content })
+        body: JSON.stringify({ message: tempMessage.content }),
+        credentials: 'same-origin'
       });
 
       if (!resp.ok) {

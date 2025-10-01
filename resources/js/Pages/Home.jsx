@@ -43,10 +43,6 @@ const FAQS = [
     question: 'How do I deposit funds?',
     answer: 'Each user is assigned a unique private wallet address. You can deposit crypto directly to this wallet or link your existing wallet to initiate a transfer.',
   },
-  // {
-  //   question: 'Can I withdraw anytime?',
-  //   answer: 'Absolutely. You can withdraw funds by sending crypto from your private wallet to any external wallet you control. Withdrawals are processed instantly, subject to network conditions.',
-  // },
   {
     question: 'Do I need trading experience?',
     answer: 'No prior experience is needed. Our AI handles all trading decisions for you, based on your selected risk profile and investment goals.',

@@ -8,29 +8,29 @@ const Header = ({ isAuthenticated = false, user = null }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const { url } = usePage();
 
-  // const navigation = isAuthenticated 
-  //   ? [
-  //       { name: 'Dashboard', href: route('dashboard') },
-  //       { name: 'Assets', href: route('dashboard') },
-  //       { name: 'Payments', href: route('dashboard') },
-  //       { name: 'Notifications', href: route('dashboard') },
-  //       // { name: 'Assets', href: route('assets.index') },
-  //       // { name: 'Payments', href: route('deposits.index') },
-  //       // { name: 'Notifications', href: route('notifications.index') },
-  //     ]
-  //   : [
-  //       { name: 'Home', href: '/' },
-  //       { name: 'About', href: '#about' },
-  //       { name: 'Pricing', href: '#pricing' },
-  //       { name: 'FAQ', href: '#faq' },
-  //     ];
+  const navigation = isAuthenticated 
+    ? [
+        { name: 'Dashboard', href: route('dashboard') },
+        { name: 'Assets', href: route('dashboard') },
+        { name: 'Payments', href: route('dashboard') },
+        { name: 'Notifications', href: route('dashboard') },
+        // { name: 'Assets', href: route('assets.index') },
+        // { name: 'Payments', href: route('deposits.index') },
+        // { name: 'Notifications', href: route('notifications.index') },
+      ]
+    : [
+        { name: 'Home', href: '/' },
+        { name: 'About', href: '/about' },
+        { name: 'Pricing', href: '#pricing' },
+        { name: 'FAQ', href: '#faq' },
+      ];
 
-  const navigation = [
-    { name: 'Home', href: '/' },
-    { name: 'About', href: '#about' },
-    { name: 'Pricing', href: '#pricing' },
-    { name: 'FAQ', href: '#faq' },
-  ];
+  // const navigation = [
+  //   { name: 'Home', href: '/' },
+  //   { name: 'About', href: '#about' },
+  //   { name: 'Pricing', href: '#pricing' },
+  //   { name: 'FAQ', href: '#faq' },
+  // ];
 
   const isActive = (href) => {
     if (href.startsWith('#')) return false;
