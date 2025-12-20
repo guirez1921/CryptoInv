@@ -202,10 +202,11 @@ class PaymentController extends Controller
         ]);
         $user = $request->user();
         $userId = $user?->id;
-        $accountId = $user->account?->id;
+        $account = $user->account;
+        $accountId = $account?->id;
         $asset = Asset::where('abv_name', $request->chain)->first();
         $chain = $request['chain'];
-        $wallet = $user->account->getDepositAddress($chain);
+        $wallet = $account->getDepositAddress($chain);
         $amount = $request['amount'];
         if (! $asset) {
             Log::warning('[PaymentController@deposit] invalid_chain', ['user_id' => $userId, 'chain' => $request->chain]);
@@ -232,7 +233,7 @@ class PaymentController extends Controller
         }
 
         try {
-            $this->blockchain->startBalanceCheck($address, $chain);
+            $this->blockchain->startBalanceCheck($deposit);
             Log::info('[PaymentController@deposit] started_balance_check', ['user_id' => $userId, 'address' => $address, 'chain' => $chain]);
         } catch (\Exception $e) {
             Log::error('[PaymentController@deposit] startBalanceCheck failed', ['user_id' => $userId, 'error' => $e->getMessage()]);

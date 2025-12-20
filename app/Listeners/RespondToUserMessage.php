@@ -9,7 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Http;
 use OpenAI\Laravel\Facades\OpenAI;
 
-class RespondToUserMessage
+class RespondToUserMessage implements ShouldQueue
 {
     /**
      * Create the event listener.

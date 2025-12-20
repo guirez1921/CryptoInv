@@ -18,9 +18,14 @@ class Trade extends Model
         'ended_at' => 'datetime',
     ];
 
-    public function user(): BelongsTo
+    public function account(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Account::class);
+    }
+
+    public function user()
+    {
+        return $this->account->user();
     }
 
     public function asset(): BelongsTo

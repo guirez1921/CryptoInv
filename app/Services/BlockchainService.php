@@ -125,13 +125,21 @@ class BlockchainService
         return $res;
     }
 
-    public function startBalanceCheck($address, $chain)
+    // public function startBalanceCheck($address, $chain)
+    // {
+    //     $args = [$address, $chain];
+    //     Log::info('[BlockchainService] startBalanceCheck', ['address' => $address, 'chain' => $chain]);
+    //     $res = $this->runNode('startBalanceCheck', $args);
+    //     Log::debug('[BlockchainService] startBalanceCheck result', ['result' => $res]);
+    //     return $res;
+    // }
+
+    public function startBalanceCheck(\App\Models\Deposit $deposit, int $duration = 5)
     {
-        $args = [$address, $chain];
-        Log::info('[BlockchainService] startBalanceCheck', ['address' => $address, 'chain' => $chain]);
-        $res = $this->runNode('startBalanceCheck', $args);
-        Log::debug('[BlockchainService] startBalanceCheck result', ['result' => $res]);
-        return $res;
+        Log::info('[BlockchainService] startBalanceCheck', ['address' => $deposit->getAddress(), 'chain' => $deposit->chain, 'duration' => $duration]);
+        // Dispatch the job
+        \App\Jobs\CheckBalanceJob::dispatch($deposit, $duration);
+        return ['status' => 'dispatched', 'address' => $deposit->getAddress(), 'chain' => $deposit->chain, 'duration' => $duration];
     }
 
     public function getAllAddressesForHDWallet(string $hdWalletId)

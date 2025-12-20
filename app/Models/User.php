@@ -58,32 +58,17 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(Account::class);
     }
-
-    public function deposits(): HasMany
-    {
-        return $this->hasMany(Deposit::class);
-    }
-
-    public function withdrawals(): HasMany
-    {
-        return $this->hasMany(Withdrawal::class);
-    }
-
-    public function trades(): HasMany
-    {
-        return $this->hasMany(Trade::class);
-    }
-
+    
     public function devices(): HasMany
     {
         return $this->hasMany(UserDevice::class);
     }
-
+    
     public function sessions(): HasMany
     {
         return $this->hasMany(UserSession::class);
     }
-
+    
     public function chats(): HasMany
     {
         return $this->hasMany(Chat::class);
@@ -93,15 +78,44 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(UserPreference::class);
     }
-
-    // public function adminChats()
-    // {
-    //     return $this->hasMany(Chat::class, 'admin_id');
-    // }
-
+    
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
+    }
+
+    public function deposits()
+    {
+        return $this->account->deposits();
+    }
+
+    public function withdrawals()
+    {
+        return $this->account->withdrawals();
+    }
+
+    public function trades()
+    {
+        return $this->account->trades();
+    }
+
+    public function userAssets()
+    {
+        return $this->hasMany(UserAsset::class);
+    }
+
+    public function assets()
+    {
+        return $this->belongsToMany(Asset::class, 'user_assets')
+            ->withPivot([
+                'available_balance',
+                'locked_balance',
+                'invested_balance',
+                'average_entry_price',
+                'total_deposited',
+                'total_withdrawn',
+            ])
+            ->withTimestamps();
     }
 
     // Check if user is admin

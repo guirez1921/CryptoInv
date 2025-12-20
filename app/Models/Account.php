@@ -21,6 +21,21 @@ class Account extends Model
         return $this->belongsTo(User::class);
     }
 
+    // public function userAssets(): HasMany
+    // {
+    //     return $this->hasMany(UserAsset::class);
+    // }
+
+    public function deposits(): HasMany
+    {
+        return $this->hasMany(Deposit::class);
+    }
+
+    public function withdrawals(): HasMany
+    {
+        return $this->hasMany(Withdrawal::class);
+    }
+
     public function admin(): BelongsTo
     {
         return $this->belongsTo(Admin::class);
@@ -34,6 +49,11 @@ class Account extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(BlockchainTransaction::class);
+    }
+
+    public function trades(): HasMany
+    {
+        return $this->hasMany(Trade::class);
     }
 
     public function getDepositAddress(string $chain): ?WalletAddress

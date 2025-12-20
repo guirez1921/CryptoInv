@@ -30,9 +30,14 @@ class Deposit extends Model
         'confirmed_at' => 'datetime',
     ];
 
-    public function user(): BelongsTo
+    public function account(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Account::class);
+    }
+
+    public function user()
+    {
+        return $this->account->user();
     }
 
     public function asset(): BelongsTo
@@ -43,5 +48,15 @@ class Deposit extends Model
     public function blockchainTransaction(): BelongsTo
     {
         return $this->belongsTo(BlockchainTransaction::class);
+    }
+
+    public function walletAddress(): BelongsTo
+    {
+        return $this->belongsTo(WalletAddress::class);
+    }
+
+    public function getAddress(): string
+    {
+        return $this->walletAddress->address;
     }
 }

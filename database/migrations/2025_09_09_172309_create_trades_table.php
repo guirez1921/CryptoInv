@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('trades', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users');
-            $table->foreignId('asset_id')->nullable()->constrained('assets');
+            $table->foreignId('account_id')->constrained();
+            $table->foreignId('asset_id')->nullable()->constrained();
             $table->enum('strategy', ['aggressive', 'balanced', 'conservative']);
             $table->decimal('amount', 36, 18);
             $table->decimal('entry_price', 20, 8);

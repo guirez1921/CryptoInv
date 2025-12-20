@@ -238,7 +238,7 @@ const Home = () => {
             </div>
 
             <div className="relative">
-              <div className="flex space-x-6 animate-slide-right">
+              <div className="flex space-x-6 animate-slide-left">
                 {[...testimonials, ...testimonials].map((testimonial, index) => (
                   <Card
                     key={index}

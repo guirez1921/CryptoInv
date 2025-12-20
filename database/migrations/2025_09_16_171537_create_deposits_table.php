@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('deposits', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('account_id')->constrained()->onDelete('cascade');
             $table->foreignId('asset_id')->constrained()->onDelete('cascade');
             $table->foreignId('blockchain_transaction_id')->nullable()->constrained()->onDelete('set null');
             $table->foreignId('wallet_address_id')->nullable()->constrained()->onDelete('set null');
