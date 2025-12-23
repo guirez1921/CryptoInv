@@ -25,13 +25,6 @@ const Header = ({ isAuthenticated = false, user = null }) => {
         { name: 'FAQ', href: '#faq' },
       ];
 
-  // const navigation = [
-  //   { name: 'Home', href: '/' },
-  //   { name: 'About', href: '#about' },
-  //   { name: 'Pricing', href: '#pricing' },
-  //   { name: 'FAQ', href: '#faq' },
-  // ];
-
   const isActive = (href) => {
     if (href.startsWith('#')) return false;
     return url === href || url.startsWith(href);

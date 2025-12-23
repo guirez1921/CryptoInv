@@ -8,6 +8,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\ClientErrorController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -24,8 +25,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
     // Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
-    Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
     // Internal endpoints used by the frontend to fetch blockchain data via BlockchainService
+    Route::get('/payments', [PaymentController::class, 'index'])->name('payments.index');
     Route::get('/payments/chains/supported', [PaymentController::class, 'supportedChains'])->name('payments.supportedChains');
     Route::get('/payments/{chain}/deposit-address', [PaymentController::class, 'getOrCreateDepositAddress'])->name('payments.getDepositAddress');
     Route::post('/payments/deposit/monitor', [PaymentController::class, 'startDepositMonitoring'])->name('payments.startDepositMonitoring');
@@ -87,6 +88,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // Endpoint to receive client-side error reports from the browser
-Route::post('/client-errors', [\App\Http\Controllers\ClientErrorController::class, 'store']);
+Route::post('/client-errors', [ClientErrorController::class, 'store']);
 
 require __DIR__ . '/auth.php';

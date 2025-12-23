@@ -111,9 +111,20 @@ const Home = () => {
       <CryptoMarquee />
       <div>
         {/* Hero Section */}
-        <section className="relative overflow-hidden bg-[url('/storage/hero-bg.gif')] bg-cover bg-center bg-no-repeat">
-          <div className="absolute inset-0 bg-gradient-to-r from-cyan-900/20 to-blue-900/20"></div>
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        {/* <section className="relative overflow-hidden bg-[url('/storage/hero-bg.gif')] bg-cover bg-center bg-no-repeat"> */}
+        <section className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/20 via-slate-900/40 to-slate-900/60 z-10 backdrop-blur-sm"></div>
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          >
+            <source src="/storage/hero-bg.mp4" type="video/mp4" />
+          </video>
+          {/* <div className="absolute inset-0 bg-gradient-to-r from-cyan-900/20 to-blue-900/20"></div> */}
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 z-20">
             <div className="text-center">
               <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
                 AI-Powered <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Crypto Investments</span>
