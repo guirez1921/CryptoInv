@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from '@inertiajs/react';
 import { TrendingUp, Shield, Zap, Users, ChevronDown, Check, Badge, Star } from 'lucide-react';
 import CryptoAILayout from '@/Layouts/CryptoAILayout';
 import Button from '@/component/UI/Button';
 import Card from '@/component/UI/Card';
+import CryptoMarquee from '@/Component/UI/CryptoMarquee';
+import CoinList from '@/Component/UI/CoinList';
+import CoinPrice from '@/Component/UI/CoinPrice';
 
 // Mock data - these would normally come from props or API
 const INVESTMENT_TIERS = [
@@ -91,11 +94,24 @@ const recentWithdrawals = [
 
 
 const Home = () => {
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://files.coinmarketcap.com/static/widget/coinMarquee.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    }
+  }, []);
+
   return (
     <CryptoAILayout title="CryptoAI - AI-Powered Crypto Investments">
+      {/* <div id="coinmarketcap-widget-marquee" coins="1,1027,825,5426,2,5176,3408,74,1839,28321,6535" currency="USD" theme="dark" transparent="true" show-symbol-logo="true"></div> */}
+      <CryptoMarquee />
       <div>
         {/* Hero Section */}
-        <section className="relative overflow-hidden">
+        <section className="relative overflow-hidden bg-[url('/storage/hero-bg.gif')] bg-cover bg-center bg-no-repeat">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-900/20 to-blue-900/20"></div>
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
             <div className="text-center">
@@ -320,6 +336,28 @@ const Home = () => {
             </div>
           </div>
         </section> */}
+
+        {/* Market Overview */}
+        <section className="py-24 bg-gradient-to-r from-cyan-900/40 to-blue-900/40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Market Overview</h2>
+              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                Real-time cryptocurrency prices and market data
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+              <CoinPrice coinId="bitcoin" />
+              <CoinPrice coinId="ethereum" />
+              <CoinPrice coinId="binancecoin" />
+            </div>
+
+            <div className="mt-8">
+              <CoinList />
+            </div>
+          </div>
+        </section>
 
         {/* Security */}
         <section className="py-24 bg-gray-900/50">

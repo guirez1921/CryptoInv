@@ -13,16 +13,15 @@ export default function CryptoAILayout({ children, title = 'CryptoAI', showHeade
             <Head title={title} />
             <div className="min-h-screen bg-gray-900 flex flex-col">
                 {showHeader && (
-                    <Header 
-                        isAuthenticated={isAuthenticated} 
+                    <Header
+                        isAuthenticated={isAuthenticated}
                         user={user}
                     />
                 )}
-                
                 <main className="flex-1">
                     {children}
                 </main>
-                
+
                 {showFooter && <Footer />}
             </div>
         </>
