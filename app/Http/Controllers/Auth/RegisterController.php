@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Admin;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,7 @@ class RegisterController extends Controller
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
             'telegram' => $request->telegram,
+            'email_verified_at' => Carbon ::now(), // Temporary auto-verification
         ]);
 
         $admin = Admin::first(); // or assign based on region, role, etc.
@@ -68,12 +70,16 @@ class RegisterController extends Controller
 
 
         // Trigger email verification
-        event(new Registered($user));
+        // event(new Registered($user));
+        
+        // Manually invoke RegistrationListener to create wallet without triggering email verification
+        app(\App\Listeners\RegistrationListener::class)->handle(new Registered($user));
 
         // Log the user in
         Auth::login($user);
 
         // Redirect to email verification notice
-        return redirect()->route('verification.notice');
+        // Redirect to dashboard (skip verification notice)
+        return redirect()->route('dashboard');
     }
 }
