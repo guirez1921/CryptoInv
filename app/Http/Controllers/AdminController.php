@@ -65,6 +65,90 @@ class AdminController extends Controller
     }
 
     /**
+     * Display detailed view of a single user
+     */
+    public function showUser($userId): Response
+    {
+        $user = User::with([
+            'account.hdWallet.addresses',
+            'account.transactions' => function ($query) {
+                $query->latest()->limit(10);
+            }
+        ])->findOrFail($userId);
+
+        // Get wallet data
+        $walletData = null;
+        if ($user->account && $user->account->hdWallet) {
+            $hdWallet = $user->account->hdWallet;
+            $addresses = $hdWallet->addresses;
+
+            // Group addresses by chain
+            $groupedAddresses = $addresses->groupBy('chain')->map(function ($chainAddresses, $chain) {
+                return [
+                    'chain' => $chain,
+                    'addresses' => $chainAddresses->map(function ($address) {
+                        return [
+                            'id' => $address->id,
+                            'address' => $address->address,
+                            'balance' => $address->balance,
+                            'asset' => $address->asset,
+                            'is_used' => $address->is_used,
+                            'created_at' => $address->created_at->format('M d, Y H:i'),
+                        ];
+                    }),
+                    'total_balance' => $chainAddresses->sum('balance'),
+                ];
+            })->values();
+
+            $walletData = [
+                'id' => $hdWallet->id,
+                'type' => $hdWallet->type,
+                'status' => $hdWallet->status,
+                'created_at' => $hdWallet->created_at->format('M d, Y H:i'),
+                'is_active' => $hdWallet->is_active,
+                'is_locked' => $hdWallet->isLocked(),
+                'address_count' => $addresses->count(),
+                'total_balance' => $hdWallet->getTotalBalance(),
+                'grouped_addresses' => $groupedAddresses,
+            ];
+        }
+
+        // Format user data
+        $userData = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'is_active' => $user->is_active,
+            'email_verified_at' => $user->email_verified_at?->format('M d, Y H:i'),
+            'created_at' => $user->created_at->format('M d, Y H:i'),
+            'account' => $user->account ? [
+                'id' => $user->account->id,
+                'total_balance' => $user->account->total_balance,
+                'available_balance' => $user->account->available_balance ?? 0,
+                'invested_balance' => $user->account->invested_balance ?? 0,
+                'profit_loss' => $user->account->profit_loss ?? 0,
+            ] : null,
+            'recent_transactions' => $user->account?->transactions->map(function ($tx) {
+                return [
+                    'id' => $tx->id,
+                    'type' => $tx->type,
+                    'amount' => $tx->amount,
+                    'chain' => $tx->chain,
+                    'status' => $tx->status,
+                    'tx_hash' => $tx->tx_hash,
+                    'created_at' => $tx->created_at->format('M d, Y H:i'),
+                ];
+            }) ?? [],
+        ];
+
+        return Inertia::render('Admin/UserDetail', [
+            'user' => $userData,
+            'wallet' => $walletData,
+        ]);
+    }
+
+
+    /**
      * Process manual deposit for a user.
      */
     public function processDeposit(Request $request): RedirectResponse
@@ -453,6 +537,127 @@ class AdminController extends Controller
         ];
 
         return response()->json($stats);
+    }
+
+    /**
+     * Get user transactions with pagination and filters
+     */
+    public function getUserTransactions(Request $request, $userId)
+    {
+        $perPage = $request->input('per_page', 20);
+        $type = $request->input('type');
+        $chain = $request->input('chain');
+        $status = $request->input('status');
+
+        $user = User::findOrFail($userId);
+        
+        if (!$user->account) {
+            return response()->json([
+                'transactions' => [],
+                'total' => 0,
+            ]);
+        }
+
+        $query = BlockchainTransaction::where('account_id', $user->account->id);
+
+        if ($type) {
+            $query->where('type', $type);
+        }
+
+        if ($chain) {
+            $query->where('chain', $chain);
+        }
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        $transactions = $query->with(['walletAddress'])
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'transactions' => $transactions->map(function ($tx) {
+                return [
+                    'id' => $tx->id,
+                    'type' => $tx->type,
+                    'amount' => $tx->amount,
+                    'chain' => $tx->chain,
+                    'status' => $tx->status,
+                    'tx_hash' => $tx->tx_hash,
+                    'from_address' => $tx->from_address,
+                    'to_address' => $tx->to_address,
+                    'gas_fee' => $tx->gas_fee,
+                    'error_message' => $tx->error_message,
+                    'confirmed_at' => $tx->confirmed_at?->format('M d, Y H:i'),
+                    'created_at' => $tx->created_at->format('M d, Y H:i'),
+                ];
+            }),
+            'total' => $transactions->total(),
+            'current_page' => $transactions->currentPage(),
+            'last_page' => $transactions->lastPage(),
+        ]);
+    }
+
+    /**
+     * View wallet mnemonic (admin only, requires password confirmation)
+     */
+    public function viewMnemonic(Request $request, $userId)
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'string']
+        ]);
+
+        // Verify admin password
+        if (!\Hash::check($validated['password'], Auth::user()->password)) {
+            return response()->json([
+                'error' => 'Invalid password. Please confirm your password to view mnemonic.'
+            ], 403);
+        }
+
+        $user = User::findOrFail($userId);
+        $account = $user->account;
+
+        if (! $account || !$account->hdWallet) {
+            return response()->json([
+                'error' => 'No HD wallet found for this user.'
+            ], 404);
+        }
+
+        // Get mnemonic from blockchain service
+        try {
+            $mnemonic = app(BlockchainService::class)->getMnemonic($account->hdWallet->id);
+
+            // Log mnemonic access for audit
+            Log::warning('Admin viewed user wallet mnemonic', [
+                'admin_id' => Auth::id(),
+                'admin_email' => Auth::user()->email,
+                'user_id' => $userId,
+                'user_email' => $user->email,
+                'hd_wallet_id' => $account->hdWallet->id,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'mnemonic' => $mnemonic,
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to retrieve mnemonic', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to retrieve mnemonic. Please try again.'
+            ], 500);
+        }
     }
 
     /**

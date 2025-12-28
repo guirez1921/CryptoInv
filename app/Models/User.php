@@ -121,7 +121,12 @@ class User extends Authenticatable implements MustVerifyEmail
     // Check if user is admin
     public function isAdmin(): bool
     {
-        return $this->is_admin;
+        return $this->adminProfile()->exists();
+    }
+
+    public function adminProfile(): HasOne
+    {
+        return $this->hasOne(Admin::class);
     }
 
     // Get the admin for this user's account

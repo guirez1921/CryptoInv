@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  Users, 
-  Search, 
-  ChevronDown, 
-  DollarSign, 
-  MessageSquare, 
-  Plus, 
-  Send, 
-  Eye, 
-  EyeOff, 
-  Check, 
+import {
+  Users,
+  Search,
+  ChevronDown,
+  DollarSign,
+  MessageSquare,
+  Plus,
+  Send,
+  Eye,
+  EyeOff,
+  Check,
   X,
   Filter,
   Download,
@@ -24,7 +24,7 @@ import CryptoAIAuthLayout from '@/Layouts/CryptoAIAuthLayout';
 import Button from '@/component/UI/Button';
 import Card from '@/component/UI/Card';
 
-const AdminDashboard = ({ 
+const AdminDashboard = ({
   users = [],
   stats = {
     totalUsers: 0,
@@ -104,8 +104,8 @@ const AdminDashboard = ({
   };
 
   const toggleUserSelection = (userId) => {
-    setSelectedUsers(prev => 
-      prev.includes(userId) 
+    setSelectedUsers(prev =>
+      prev.includes(userId)
         ? prev.filter(id => id !== userId)
         : [...prev, userId]
     );
@@ -114,8 +114,8 @@ const AdminDashboard = ({
   const selectAllUsers = () => {
     const filteredUserIds = filteredUsers.map(user => user.id);
     setSelectedUsers(
-      selectedUsers.length === filteredUserIds.length 
-        ? [] 
+      selectedUsers.length === filteredUserIds.length
+        ? []
         : filteredUserIds
     );
   };
@@ -123,13 +123,13 @@ const AdminDashboard = ({
   // Filter users based on search and status
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filterStatus === 'all' || 
-                         (filterStatus === 'active' && user.is_active) ||
-                         (filterStatus === 'inactive' && !user.is_active) ||
-                         (filterStatus === 'verified' && user.email_verified_at) ||
-                         (filterStatus === 'unverified' && !user.email_verified_at);
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = filterStatus === 'all' ||
+      (filterStatus === 'active' && user.is_active) ||
+      (filterStatus === 'inactive' && !user.is_active) ||
+      (filterStatus === 'verified' && user.email_verified_at) ||
+      (filterStatus === 'unverified' && !user.email_verified_at);
 
     return matchesSearch && matchesStatus;
   });
@@ -216,7 +216,7 @@ const AdminDashboard = ({
                   </span>
                 )}
               </div>
-              
+
               <div className="flex items-center space-x-3">
                 {selectedUsers.length > 0 && (
                   <Button
@@ -249,7 +249,7 @@ const AdminDashboard = ({
                   />
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Filter className="w-4 h-4 text-gray-400" />
                 <select
@@ -312,11 +312,10 @@ const AdminDashboard = ({
                       </td>
                       <td className="py-4">
                         <div className="space-y-1">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            user.is_active 
-                              ? 'bg-green-500/20 text-green-400' 
+                          <span className={`px-2 py-1 text-xs rounded-full ${user.is_active
+                              ? 'bg-green-500/20 text-green-400'
                               : 'bg-gray-500/20 text-gray-400'
-                          }`}>
+                            }`}>
                             {user.is_active ? 'Active' : 'Inactive'}
                           </span>
                           {user.email_verified_at && (
@@ -339,6 +338,14 @@ const AdminDashboard = ({
                       </td>
                       <td className="py-4">
                         <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.get(route('admin..users.show', user.id))}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
@@ -519,11 +526,10 @@ const AdminDashboard = ({
                           messageForm.setData('type', type.value);
                         }
                       }}
-                      className={`p-2 rounded-md border text-sm font-medium transition-colors ${
-                        (selectedUsers.length > 1 ? bulkMessageForm.data.type : messageForm.data.type) === type.value
+                      className={`p-2 rounded-md border text-sm font-medium transition-colors ${(selectedUsers.length > 1 ? bulkMessageForm.data.type : messageForm.data.type) === type.value
                           ? `${type.color} text-white border-transparent`
                           : 'bg-gray-700 text-gray-300 border-gray-600 hover:border-gray-500'
-                      }`}
+                        }`}
                     >
                       {type.label}
                     </button>
@@ -584,14 +590,14 @@ const AdminDashboard = ({
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={selectedUsers.length > 1 ? bulkMessageForm.processing : messageForm.processing}
                 >
                   <Send className="w-4 h-4 mr-2" />
-                  {selectedUsers.length > 1 && bulkMessageForm.processing ? 'Sending...' : 
-                   !selectedUsers.length > 1 && messageForm.processing ? 'Sending...' : 
-                   'Send Message'}
+                  {selectedUsers.length > 1 && bulkMessageForm.processing ? 'Sending...' :
+                    !selectedUsers.length > 1 && messageForm.processing ? 'Sending...' :
+                      'Send Message'}
                 </Button>
               </div>
             </form>

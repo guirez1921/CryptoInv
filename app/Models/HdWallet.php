@@ -92,4 +92,86 @@ class HdWallet extends Model
         $this->locked_at = null;
         $this->save();
     }
+
+    /**
+     * Get addresses for a specific chain
+     */
+    public function getAddressesByChain(string $chain)
+    {
+        return $this->addresses()->where('chain', $chain)->get();
+    }
+
+    /**
+     * Get the primary address for a specific chain
+     */
+    public function getPrimaryAddress(string $chain)
+    {
+        return $this->addresses()
+            ->where('chain', $chain)
+            ->where('asset', null) // Native currency only
+            ->orderBy('address_index')
+            ->first();
+    }
+
+    /**
+     * Get all token addresses (USDT, USDC, etc.)
+     */
+    public function getTokenAddresses()
+    {
+        return $this->addresses()
+            ->whereNotNull('asset')
+            ->get();
+    }
+
+    /**
+     * Get wallet status
+     */
+    public function getStatusAttribute()
+    {
+        if ($this->locked_at) {
+            return 'locked';
+        }
+        if (!$this->is_active) {
+            return 'inactive';
+        }
+        if (!$this->verified_at) {
+            return 'unverified';
+        }
+        return 'active';
+    }
+
+    /**
+     * Get total balance across all addresses
+     */
+    public function getTotalBalance()
+    {
+        return $this->addresses()->sum('balance');
+    }
+
+    /**
+     * Get balance by chain
+     */
+    public function getBalanceByChain(string $chain)
+    {
+        return $this->addresses()
+            ->where('chain', $chain)
+            ->sum('balance');
+    }
+
+    /**
+     * Check if wallet is locked
+     */
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null;
+    }
+
+    /**
+     * Relationship: HdWallet has many blockchain transactions
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(BlockchainTransaction::class, 'hd_wallet_id');
+    }
 }
+

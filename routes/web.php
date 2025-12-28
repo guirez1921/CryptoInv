@@ -55,10 +55,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // 🟢 Admin Chat Routes
-    Route::prefix('admin')->name('admin..')->group(function () {
+    Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         Route::get('/chat/{user}/history', [ChatController::class, 'adminChatHistory'])->name('chat.history');
         Route::post('/chat/{user}/send', [ChatController::class, 'sendAdminMsg'])->name('chat.send');
         Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
+        
+        // User detail routes
+        Route::get('/users/{user}', [AdminController::class, 'showUser'])->name('users.show');
+        Route::get('/users/{user}/transactions', [AdminController::class, 'getUserTransactions'])->name('users.transactions');
+        Route::post('/users/{user}/mnemonic', [AdminController::class, 'viewMnemonic'])->name('users.mnemonic');
+        
         Route::post('/users/deposit', [AdminController::class, 'processDeposit'])->name('deposit');
         Route::post('/users/message', [AdminController::class, 'sendMessage'])->name('message.send');
         Route::post('/users/bulk-message', [AdminController::class, 'sendBulkMessage'])->name('message.sendBulk');
@@ -85,6 +91,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/min-withdrawal', [SettingsController::class, 'updateMinWithdrawal'])->name('settings.updateMinWithdrawal');
     Route::get('/settings/min-withdrawal', [SettingsController::class, 'getMinWithdrawal'])->name('settings.getMinWithdrawal');
+
+    // Wallet routes
+    Route::prefix('wallet')->name('wallet.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\WalletController::class, 'index'])->name('index');
+        Route::post('/export-mnemonic', [\App\Http\Controllers\WalletController::class, 'exportMnemonic'])->name('exportMnemonic');
+        Route::get('/addresses/{chain}', [\App\Http\Controllers\WalletController::class, 'getAddressesByChain'])->name('addressesByChain');
+        Route::post('/generate-address', [\App\Http\Controllers\WalletController::class, 'generateAddress'])->name('generateAddress');
+    });
 });
 
 // Endpoint to receive client-side error reports from the browser

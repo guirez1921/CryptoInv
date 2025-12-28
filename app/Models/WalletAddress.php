@@ -68,4 +68,32 @@ class WalletAddress extends Model
     {
         return $query->where('is_used', false);
     }
+
+    /**
+     * Scope to filter by chain
+     */
+    public function scopeByChain($query, string $chain)
+    {
+        return $query->where('chain', $chain);
+    }
+
+    /**
+     * Scope to filter by asset (tokens)
+     */
+    public function scopeByAsset($query, ?string $asset = null)
+    {
+        if ($asset === null) {
+            return $query->whereNull('asset');
+        }
+        return $query->where('asset', $asset);
+    }
+
+    /**
+     * Scope to get token addresses only
+     */
+    public function scopeTokensOnly($query)
+    {
+        return $query->whereNotNull('asset');
+    }
 }
+

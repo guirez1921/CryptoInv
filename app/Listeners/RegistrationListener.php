@@ -52,10 +52,20 @@ class RegistrationListener
         }
 
         try {
-            // Call Node.js API to generate wallet
-            $this->blockchain->createHDWallet($account->id);
+            // Dispatch queue job for HD wallet creation with retry mechanism
+            \App\Jobs\CreateHDWalletJob::dispatch($account->id, $user->id);
+            
+            Log::info("HD Wallet creation job dispatched for user {$user->id}, account {$account->id}");
         } catch (\Exception $e) {
-            Log::error("Error calling Node.js service for user {$user->id}: " . $e->getMessage());
+            Log::error("Error dispatching HD wallet creation job for user {$user->id}: " . $e->getMessage());
+            
+            // Fallback: Try synchronous creation if queue dispatch fails
+            try {
+                $this->blockchain->createHDWallet($account->id);
+                Log::info("HD Wallet created synchronously for user {$user->id} after queue dispatch failed");
+            } catch (\Exception $syncError) {
+                Log::critical("Both queue and synchronous HD wallet creation failed for user {$user->id}: " . $syncError->getMessage());
+            }
         }
 
         $admin = $user->account->admin ?? Admin::first();

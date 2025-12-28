@@ -1,9 +1,9 @@
 // Ensure we load the Laravel .env so the blockchain JS uses the same environment variables.
-// try {
-//   require('./env').loadEnv();
-// } catch (e) {
-//   // not fatal
-// }
+try {
+  require('./env').loadEnv();
+} catch (e) {
+  // not fatal
+}
 const WalletService = require('./service');
 const startBalanceCron = require('./cron');
 const DB = require('./database');
@@ -36,7 +36,8 @@ dotenv.config(); // Load .env file if present
         result = await WalletService.createAddress(
           args[0], // hdWalletId
           args[1], // chain
-          addrIndex
+          addrIndex,
+          args[3] // asset (optional)
         );
         break;
 
@@ -51,9 +52,8 @@ dotenv.config(); // Load .env file if present
         result = await WalletService.transferToMaster(
           args[0], // fromWalletId
           args[1], // toMasterAddress
-          args[2], // amount
-          args[3], // chain
-          args[4] ?? null // assetId (optional)
+          args[2], // chain
+          args[3] ?? null // assetId (optional)
         );
         break;
 
@@ -99,6 +99,12 @@ dotenv.config(); // Load .env file if present
 
       case 'syncHDWalletBalances':
         result = await WalletService.syncHDWalletBalances(
+          args[0] // hdWalletId
+        );
+        break;
+
+      case 'getMnemonic':
+        result = await WalletService.getMnemonic(
           args[0] // hdWalletId
         );
         break;

@@ -55,7 +55,7 @@ class LoginController extends Controller
             return redirect()->route('verification.notice');
         }
 
-        if (Auth::user()->is_admin) {
+        if (Auth::user()->isAdmin()) {
             return redirect()->intended(route('admin.dashboard'));
         }
         return redirect()->intended(route('dashboard'));

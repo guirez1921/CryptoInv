@@ -46,6 +46,15 @@ class Account extends Model
         return $this->hasMany(HdWallet::class);
     }
 
+    /**
+     * Get the primary HD wallet for this account
+     */
+    public function hdWallet()
+    {
+        return $this->hasOne(HdWallet::class);
+    }
+
+
     public function transactions(): HasMany
     {
         return $this->hasMany(BlockchainTransaction::class);

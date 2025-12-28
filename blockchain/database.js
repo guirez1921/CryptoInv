@@ -249,6 +249,59 @@ class HDWalletDB {
     const [rows] = await pool.execute(query, [accountId]);
     return rows;
   }
+  // Get pending deposit for an address
+  static async getPendingDeposit(address, chain) {
+    // Join with wallet_addresses to find the deposit linked to this address
+    const query = `
+      SELECT d.*, wa.address 
+      FROM deposits d
+      JOIN wallet_addresses wa ON d.wallet_address_id = wa.id
+      WHERE wa.address = ? 
+      AND d.chain = ? 
+      AND d.status = 'pending'
+      LIMIT 1
+    `;
+    const [rows] = await pool.execute(query, [address, chain]);
+    return rows[0];
+  }
+
+  // Confirm deposit and credit user account
+  static async confirmDeposit(depositId, cryptoPrice, usdAmount) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Update deposit status
+      await connection.execute(
+        'UPDATE deposits SET status = ?, description = ?, updated_at = NOW() WHERE id = ?',
+        ['completed', JSON.stringify({ price_at_confirmation: cryptoPrice, usd_amount: usdAmount }), depositId]
+      );
+
+      // 2. Get deposit details to find user account
+      const [deposits] = await connection.execute('SELECT * FROM deposits WHERE id = ?', [depositId]);
+      if (deposits.length === 0) throw new Error('Deposit not found');
+      const deposit = deposits[0];
+
+      // 3. Credit user account
+      // Find the account linked to the user of this deposit (User -> Account)
+      // Deposit has user_id (PaymentController: $user->deposits()->create)
+      const userId = deposit.user_id;
+
+      // Update account balance
+      await connection.execute(
+        'UPDATE accounts SET total_balance = total_balance + ?, available_balance = available_balance + ?, updated_at = NOW() WHERE user_id = ?',
+        [usdAmount, usdAmount, userId]
+      );
+
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
 }
 
 module.exports = HDWalletDB;

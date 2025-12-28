@@ -1,3 +1,5 @@
+const { loadEnv } = require('./env');
+loadEnv();
 const { ethers } = require('ethers');
 const bitcoin = require('bitcoinjs-lib');
 const { Connection, PublicKey, LAMPORTS_PER_SOL, Keypair, Transaction, SystemProgram } = require('@solana/web3.js');
@@ -5,7 +7,9 @@ const crypto = require('crypto');
 const bip39 = require('bip39');
 const { BIP32Factory } = require('bip32');
 const ecc = require('tiny-secp256k1');
+const { ECPairFactory } = require('ecpair');
 const bip32 = BIP32Factory(ecc);
+const ECPair = ECPairFactory(ecc);
 const HDWalletDB = require('./database');
 const TronWeb = require('tronweb');
 const dotenv = require('dotenv');
@@ -44,11 +48,13 @@ const derivationPaths = {
 const TOKEN_CONTRACTS = {
     USDT: {
         ethereum: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        sepolia: "0x7169D38820dfd117C3FA1f22a697dBA58d90BA06",
         tron: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", // USDT TRC20 contract
     },
     // You can add more tokens here
     USDC: {
         ethereum: "0xA0b86a33E6441B6A9Ff84FC6C7Fe3C8e0aFa73DE",
+        sepolia: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
         polygon: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
     }
 };
@@ -100,6 +106,9 @@ const SUPPORTED_WALLETS = {
     solanaDevnet: { type: 'SOL', coinType: 501, nativeCurrency: 'SOL', icon: '' },
     tronShasta: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX', icon: '' },
     tronNile: { type: 'TRX', coinType: 195, nativeCurrency: 'TRX', icon: '' },
+    // Token aliases - these appear as separate "chains" but use Ethereum addresses
+    USDT: { type: 'EVM', coinType: 60, nativeCurrency: 'USDT', icon: '', isTokenAlias: true, baseChain: 'ethereum' },
+    USDC: { type: 'EVM', coinType: 60, nativeCurrency: 'USDC', icon: '', isTokenAlias: true, baseChain: 'ethereum' },
 };
 
 class WalletService {
@@ -127,7 +136,7 @@ class WalletService {
     }
 
     // 2. Create address for wallet
-    static async createAddress(hdWalletId, chain, addressIndex = null) {
+    static async createAddress(hdWalletId, chain, addressIndex = null, asset = null) {
         try {
             const hdWallet = await HDWalletDB.getHDWallet(hdWalletId);
             if (!hdWallet) throw new Error('HD Wallet not found');
@@ -135,12 +144,14 @@ class WalletService {
             // If an address already exists for this hdWallet and chain, return it (idempotent per-chain)
             const existingAddresses = await HDWalletDB.getWalletAddresses(hdWalletId);
             if (existingAddresses && existingAddresses.length > 0) {
-                const existingForChain = existingAddresses.find(a => a.chain === chain);
+                // Check for existing address with same chain AND asset
+                const existingForChain = existingAddresses.find(a => a.chain === chain && a.asset === asset);
                 if (existingForChain) {
                     return {
                         id: existingForChain.id,
                         address: existingForChain.address,
-                        addressIndex: existingForChain.address_index
+                        addressIndex: existingForChain.address_index,
+                        asset: existingForChain.asset
                     };
                 }
             }
@@ -171,12 +182,25 @@ class WalletService {
                 throw new Error(`Unsupported chain: ${chain}`);
             }
 
-            switch (walletType.type) {
+            // Handle token aliases: if this "chain" is actually a token alias (like USDT, USDC),
+            // we generate an address for the base chain (e.g., ethereum) but tag it with the asset
+            let actualChainForGeneration = chain;
+            let actualAsset = asset;
+
+            if (walletType.isTokenAlias) {
+                actualChainForGeneration = walletType.baseChain;
+                actualAsset = chain; // The "chain" name becomes the asset (USDT, USDC)
+            }
+
+            // Get the wallet type for address generation
+            const generationWalletType = SUPPORTED_WALLETS[actualChainForGeneration];
+
+            switch (generationWalletType.type) {
                 case 'EVM':
                     ({ address, derivationPath } = this.generateEVMAddress(seedBuffer, index));
                     break;
                 case 'BTC':
-                    ({ address, derivationPath } = this.generateBTCAddress(seedBuffer, index, chain.includes('testnet')));
+                    ({ address, derivationPath } = this.generateBTCAddress(seedBuffer, index, actualChainForGeneration.toLowerCase().includes('testnet')));
                     break;
                 case 'SOL':
                     ({ address, derivationPath } = this.generateSOLAddress(seedBuffer, index));
@@ -185,7 +209,7 @@ class WalletService {
                     ({ address, derivationPath } = this.generateTRXAddress(seedBuffer, index));
                     break;
                 default:
-                    throw new Error(`Unknown wallet type: ${walletType.type}`);
+                    throw new Error(`Unknown wallet type: ${generationWalletType.type}`);
             }
 
             // Save to database
@@ -194,7 +218,9 @@ class WalletService {
                 address,
                 index,
                 derivationPath,
-                chain
+                chain,
+                'spot',
+                actualAsset
             );
 
             // Update HD wallet's address index if we used the next sequential index
@@ -202,7 +228,15 @@ class WalletService {
                 await HDWalletDB.updateAddressIndex(hdWalletId, index);
             }
 
-            return walletAddress;
+
+            return {
+                id: walletAddress.id,
+                address: walletAddress.address,
+                derivationPath: walletAddress.derivation_path,
+                addressIndex: walletAddress.address_index,
+                chain: walletAddress.chain,
+                asset: actualAsset
+            };
         } catch (error) {
             throw new Error(`Failed to create address: ${error.message}`);
         }
@@ -372,7 +406,11 @@ class WalletService {
             // Update balance in database
             const dbWalletAddress = await HDWalletDB.getWalletAddressByString(walletAddress);
             if (dbWalletAddress) {
-                await HDWalletDB.updateWalletBalance(dbWalletAddress.id, balance, tokenSymbol);
+                if (tokenSymbol) {
+                    await HDWalletDB.updateTokenBalance(dbWalletAddress.id, balance, tokenSymbol);
+                } else {
+                    await HDWalletDB.updateWalletBalance(dbWalletAddress.id, balance);
+                }
             }
 
             return balance;
@@ -514,8 +552,8 @@ class WalletService {
     }
 
     // 4. Transfer asset to master wallet (withdrawal simulation)
-    // Enhanced transferToMaster with actual blockchain transfers
-    static async transferToMaster(fromWalletId, toMasterAddress, amount, chain, assetId = null) {
+    // Enhanced transferToMaster with actual blockchain transfers - SWEEP MODE
+    static async transferToMaster(fromWalletId, toMasterAddress, chain, assetId = null) {
         try {
             // Get wallet details
             const hdWallet = await HDWalletDB.getHDWallet(fromWalletId);
@@ -523,18 +561,46 @@ class WalletService {
 
             const addresses = await HDWalletDB.getWalletAddresses(fromWalletId);
 
-            // Find address with sufficient balance
+            // Find address with highest balance
             let fromAddress;
             if (assetId) {
                 // For tokens, check token balance
-                fromAddress = addresses.find(addr => parseFloat(addr.token_balance || 0) >= parseFloat(amount));
+                fromAddress = addresses.sort((a, b) => parseFloat(b.token_balance || 0) - parseFloat(a.token_balance || 0))[0];
             } else {
+                // === AUTOMATIC TOKEN SWEEP LOGIC ===
+                // If assetId is null (Native Sweep), check if we have any tokens on this chain and sweep them first.
+                // We do this by finding all addresses on this chain with a token_balance > 0.
+                const tokenAddresses = addresses.filter(a => a.chain === chain && a.asset && parseFloat(a.token_balance) > 0);
+
+                for (const tokenAddr of tokenAddresses) {
+                    console.log(`[Auto-Sweep] Found ${tokenAddr.asset} (${tokenAddr.token_balance}). Sweeping first...`);
+                    try {
+                        // Recursively call transferToMaster for the token
+                        await this.transferToMaster(fromWalletId, toMasterAddress, chain, tokenAddr.asset);
+                    } catch (e) {
+                        console.error(`[Auto-Sweep] Failed to sweep ${tokenAddr.asset}: ${e.message}`);
+                        // Continue to sweep other tokens or native currency even if one fails
+                    }
+                }
+
                 // For native currency, check native balance
-                fromAddress = addresses.find(addr => parseFloat(addr.balance) >= parseFloat(amount));
+                fromAddress = addresses.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance))[0];
             }
 
-            if (!fromAddress) {
+            if (!fromAddress || (assetId ? parseFloat(fromAddress.token_balance || 0) <= 0 : parseFloat(fromAddress.balance) <= 0)) {
                 throw new Error('Insufficient balance in wallet addresses');
+            }
+
+            // Calculate max transferable amount (Sweep)
+            let amount;
+            try {
+                amount = await this.calculateMaxTransferableAmount(fromAddress.address, chain, assetId, toMasterAddress);
+            } catch (calcError) {
+                throw new Error(`Failed to calculate max transferable amount: ${calcError.message}`);
+            }
+
+            if (parseFloat(amount) <= 0) {
+                throw new Error('Calculated transfer amount is zero or negative (insufficient for gas)');
             }
 
             // Get private key for signing
@@ -607,7 +673,9 @@ class WalletService {
                     const newNativeBalance = parseFloat(fromAddress.balance) - parseFloat(actualGasFee);
                     await HDWalletDB.updateWalletBalance(fromAddress.id, newNativeBalance.toString());
                 } else {
-                    // Update native balance (amount + fees)
+                    // Update native balance (amount + fees) aka set to near zero.
+                    // For native sweep, balance should effectively be zero, but we might differ slightly due to dust.
+                    // We calculate it: oldBalance - amount - gas.
                     const newBalance = parseFloat(fromAddress.balance) - parseFloat(amount) - parseFloat(actualGasFee);
                     await HDWalletDB.updateWalletBalance(fromAddress.id, newBalance.toString());
                 }
@@ -640,6 +708,78 @@ class WalletService {
 
         } catch (error) {
             throw new Error(`Transfer failed: ${error.message}`);
+        }
+    }
+
+    // Calculate Max Transferable Amount (Sweep)
+    static async calculateMaxTransferableAmount(address, chain, assetId, toAddress) {
+        const walletType = SUPPORTED_WALLETS[chain];
+
+        // 1. Get Balance
+        let balance;
+        if (assetId) {
+            balance = await this.getTokenBalance(address, chain, assetId);
+        } else {
+            switch (walletType.type) {
+                case 'EVM': balance = await this.getEVMBalance(address, chain); break;
+                case 'BTC': balance = await this.getBTCBalance(address, chain); break;
+                case 'SOL': balance = await this.getSOLBalance(address, chain); break;
+                case 'TRX': balance = await this.getTRXBalance(address, chain); break;
+            }
+        }
+
+        if (parseFloat(balance) === 0) return '0';
+
+        // 2. Estimate Gas and Deduct
+        if (assetId) {
+            // For tokens, max transfer is the full token balance. 
+            // Assumption: Native balance is sufficient for gas. We could check native balance here too.
+            return balance;
+        }
+
+        // For Native assets, deduct gas
+        try {
+            switch (walletType.type) {
+                case 'EVM': {
+                    const rpcUrl = rpcMap[chain];
+                    const provider = new ethers.JsonRpcProvider(rpcUrl);
+                    const feeData = await provider.getFeeData();
+                    // Estimate gas limit for a simple transfer (21000 usually)
+                    const gasLimit = 21000n;
+                    const gasCost = gasLimit * (feeData.gasPrice || 1000000000n); // fallback 1 gwei
+                    const gasCostEth = ethers.formatEther(gasCost);
+
+                    const maxAmount = parseFloat(balance) - parseFloat(gasCostEth);
+                    return maxAmount > 0 ? maxAmount.toString() : '0';
+                }
+                case 'BTC': {
+                    // Approximate BTC fee calculation or fetch UTXOs to be precise
+                    // Simple estimation: 1 input, 2 outputs (recipient + change... wait, sweep means 1 output?)
+                    // Sweep = 1 input (consolidated? no) -> All inputs -> 1 output.
+                    // For improved accuracy, we really should fetch UTXOs.
+                    // Using a safe margin for now: 0.0001 BTC if we don't fetch UTXOs.
+                    const estimatedFee = 0.0001; // can be high/low depending on UTXO count
+                    const maxAmount = parseFloat(balance) - estimatedFee;
+                    return maxAmount > 0 ? maxAmount.toString() : '0';
+                }
+                case 'SOL': {
+                    const fee = 0.000005; // Standard SOL fee
+                    const maxAmount = parseFloat(balance) - fee;
+                    return maxAmount > 0 ? maxAmount.toString() : '0';
+                }
+                case 'TRX': {
+                    const fee = 1.1; // ~1.1 TRX for transfer
+                    const maxAmount = parseFloat(balance) - fee;
+                    return maxAmount > 0 ? maxAmount.toString() : '0';
+                }
+                default:
+                    return balance; // Should not happen
+            }
+        } catch (e) {
+            console.error("Error calculating max amount:", e);
+            // Fallback: subtract a safe margin? Or throw?
+            // Throwing ensures we don't fail properly later.
+            throw e;
         }
     }
 
@@ -739,7 +879,7 @@ class WalletService {
     // Execute Bitcoin transfer
     static async executeBTCTransfer(privateKey, fromAddress, toAddress, amount, chain) {
         const network = chain.includes('testnet') ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
-        const keyPair = bitcoin.ECPair.fromPrivateKey(privateKey, { network });
+        const keyPair = ECPair.fromPrivateKey(privateKey, { network });
         const baseUrl = rpcMap[chain];
 
         try {
@@ -989,13 +1129,47 @@ class WalletService {
         };
     }
 
+    // Get mnemonic for HD wallet (admin only - for recovery)
+    static async getMnemonic(hdWalletId) {
+        try {
+            const hdWallet = await HDWalletDB.getHDWallet(hdWalletId);
+            if (!hdWallet) {
+                throw new Error('HD Wallet not found');
+            }
+
+            // Decrypt the  mnemonic
+            const mnemonic = HDWalletDB.decryptMnemonic(hdWallet.encrypted_seed);
+
+            return {
+                success: true,
+                mnemonic: mnemonic,
+                walletId: hdWallet.id
+            };
+        } catch (error) {
+            throw new Error(`Failed to retrieve mnemonic: ${error.message}`);
+        }
+    }
+
     /**
      * Return a list of supported chains and basic metadata for each
      * @returns {Promise<Array<Object>>}
      */
     static async getSupportedChains() {
         try {
-            const chains = Object.keys(SUPPORTED_WALLETS).map((key) => {
+            const chains = Object.keys(SUPPORTED_WALLETS).filter(key => {
+                if (process.env.APP_ENV === 'production') {
+                    const info = SUPPORTED_WALLETS[key];
+                    const isTestnet = key.toLowerCase().includes('testnet') ||
+                        key.toLowerCase().includes('devnet') ||
+                        key.toLowerCase().includes('sepolia') ||
+                        key.toLowerCase().includes('fuji') ||
+                        key.toLowerCase().includes('shasta') ||
+                        key.toLowerCase().includes('nile') ||
+                        key.toLowerCase().includes('alfajores'); // Add other testnet identifiers as needed
+                    return !isTestnet;
+                }
+                return true;
+            }).map((key) => {
                 const info = SUPPORTED_WALLETS[key] || {};
                 const prettyName = (key || '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 const symbol = info.nativeCurrency || key.toUpperCase();
@@ -1057,6 +1231,52 @@ class WalletService {
     }
 
     /**
+     * Fetch current crypto price in USD
+     * @param {string} symbol - The symbol to fetch (e.g., BTC, ETH, USDT)
+     * @returns {Promise<number>} Price in USD
+     */
+    static async fetchCryptoPrice(symbol) {
+        // Map symbols to CoinGecko IDs
+        const map = {
+            'BTC': 'bitcoin',
+            'ETH': 'ethereum',
+            'SOL': 'solana',
+            'TRX': 'tron',
+            'USDT': 'tether',
+            'USDC': 'usd-coin',
+            'BNB': 'binancecoin',
+            'MATIC': 'matic-network',
+            'AVAX': 'avalanche-2',
+            // Add more as needed
+        };
+
+        const id = map[symbol.toUpperCase()];
+        if (!id) {
+            // Fallback for stablecoins if they invoke this with unknown symbol but we know it's stable-ish
+            if (symbol.toUpperCase().includes('USD')) return 1.0;
+            throw new Error(`Unknown symbol definition for price fetch: ${symbol}`);
+        }
+
+        try {
+            const url = `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`CoinGecko API error: ${response.statusText}`);
+            const data = await response.json();
+
+            if (data[id] && data[id].usd) {
+                return parseFloat(data[id].usd);
+            }
+            throw new Error('Price data missing in response');
+        } catch (error) {
+            console.error(`Failed to fetch price for ${symbol}:`, error.message);
+            // Fallback? Or throw? Throwing is safer than crediting wrong amount.
+            // For stablecoins, we might fallback to 1.
+            if (symbol.toUpperCase() === 'USDT' || symbol.toUpperCase() === 'USDC') return 1.0;
+            throw error;
+        }
+    }
+
+    /**
      * Get all addresses linked to an HD wallet
      * @param {number} hdWalletId - The ID of the HD wallet
      * @returns {Promise<Object>} Object containing wallet info and all addresses
@@ -1099,7 +1319,8 @@ class WalletService {
                     balance: addr.balance,
                     lastSyncAt: addr.last_sync_at,
                     createdAt: addr.created_at,
-                    updatedAt: addr.updated_at
+                    updatedAt: addr.updated_at,
+                    asset: hdWallet.chain // Assuming 'asset' refers to the chain's native asset
                 })),
                 createdAt: hdWallet.created_at,
                 updatedAt: hdWallet.updated_at,

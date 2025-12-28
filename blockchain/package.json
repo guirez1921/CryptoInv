@@ -6,6 +6,7 @@
 		"bitcoinjs-lib": "^6.1.7",
 		"crypto": "^1.0.1",
 		"dotenv": "^16.6.1",
+		"ecpair": "^3.0.0",
 		"ethers": "^6.15.0",
 		"mysql2": "^3.15.1",
 		"node-cron": "^4.2.1",

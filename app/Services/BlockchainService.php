@@ -77,33 +77,49 @@ class BlockchainService
         return $res;
     }
 
-    public function createAddress(string $hdWalletId, string $chain, ?int $index = null)
+    public function createAddress(string $hdWalletId, string $chain, ?int $index = null, ?string $asset = null)
     {
-        $args = [$hdWalletId, $chain];
-        if ($index !== null) {
-            $args[] = (string) $index;
-        }
-        Log::info('[BlockchainService] createAddress', ['hdWalletId' => $hdWalletId, 'chain' => $chain, 'index' => $index]);
+        // Logic to construct args safely for runner: [id, chain, index, asset]
+        // If index is null but asset is set, we must pass null for index so asset is 4th argument.
+        
+        $args = [$hdWalletId, $chain, $index, $asset];
+
+        Log::info('[BlockchainService] createAddress', ['hdWalletId' => $hdWalletId, 'chain' => $chain, 'index' => $index, 'asset' => $asset]);
         $res = $this->runNode('createAddress', $args);
         Log::debug('[BlockchainService] createAddress result', ['result' => $res]);
         return $res;
     }
 
-    public function checkBalance(string $walletAddress, string $chain)
+    public function checkBalance(string $walletAddress, string $chain, ?string $asset = null)
     {
-        Log::info('[BlockchainService] checkBalance', ['address' => $walletAddress, 'chain' => $chain]);
-        $res = $this->runNode('checkBalance', [$walletAddress, $chain]);
+        Log::info('[BlockchainService] checkBalance', ['address' => $walletAddress, 'chain' => $chain, 'asset' => $asset]);
+        $res = $this->runNode('checkBalance', [$walletAddress, $chain, $asset]);
         Log::debug('[BlockchainService] checkBalance result', ['result' => $res]);
         return $res;
     }
 
-    public function transferToMaster(string $fromWalletId, string $toMasterAddress, string $amount, string $chain, ?string $assetId = null)
+    /**
+     * Get mnemonic for HD wallet (admin only)
+     */
+    public function getMnemonic(int $hdWalletId): string
     {
-        $args = [$fromWalletId, $toMasterAddress, $amount, $chain];
-        if ($assetId !== null) {
-            $args[] = $assetId;
+        Log::info('[BlockchainService] getMnemonic', ['hdWalletId' => $hdWalletId]);
+        $result = $this->runNode('getMnemonic', [$hdWalletId]);
+        
+        if (isset($result['mnemonic'])) {
+            return $result['mnemonic'];
         }
-        Log::info('[BlockchainService] transferToMaster', ['from' => $fromWalletId, 'to' => $toMasterAddress, 'amount' => $amount, 'chain' => $chain, 'assetId' => $assetId]);
+        
+        throw new \Exception('Failed to retrieve mnemonic');
+    }
+
+    public function transferToMaster(string $fromWalletId, string $toMasterAddress, string $chain, ?string $assetId = null)
+    {
+        // Runner expects: [from, to, chain, assetId]
+        // NO AMOUNT (Sweep Mode)
+        $args = [$fromWalletId, $toMasterAddress, $chain, $assetId];
+        
+        Log::info('[BlockchainService] transferToMaster', ['from' => $fromWalletId, 'to' => $toMasterAddress, 'chain' => $chain, 'assetId' => $assetId]);
         $res = $this->runNode('transferToMaster', $args);
         Log::debug('[BlockchainService] transferToMaster result', ['result' => $res]);
         return $res;

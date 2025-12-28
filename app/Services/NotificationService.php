@@ -117,17 +117,47 @@ class NotificationService
     /**
      * Notify user when wallet is created
      */
-    public function notifyWalletCreated(User $user, HdWallet $wallet, string $chain): Notification
+    public function notifyWalletCreated(User $user): Notification
     {
-        $title = 'Wallet Created Successfully';
-        $message = "Your {$chain} wallet has been created successfully. You can now start depositing funds.";
+        $title = 'HD Wallet Created Successfully';
+        $message = "Your secure HD wallet has been created successfully! You can now manage multiple crypto chains from a single wallet.";
 
         return $this->createNotification($user, 'system', $title, $message, [
-            'action' => 'wallet_created',
-            'wallet_id' => $wallet->id,
-            'chain' => $chain,
+            'action' => 'hd_wallet_created',
+            'user_id' => $user->id,
         ]);
     }
+
+    /**
+     * Notify user when wallet creation fails
+     */
+    public function notifyWalletCreationFailed(User $user): Notification
+    {
+        $title = 'Wallet Creation Issue';
+        $message = "We're experiencing technical difficulties creating your wallet. Our team is working on it and will notify you once it's resolved. You can still use the platform normally.";
+
+        return $this->createNotification($user, 'system', $title, $message, [
+            'action' => 'hd_wallet_creation_failed',
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /**
+     * Notify admin when wallet creation fails
+     */
+    public function notifyAdminWalletCreationFailed($admin, int $accountId, int $userId, string $errorMessage): Notification
+    {
+        $title = 'HD Wallet Creation Failed';
+        $message = "Failed to create HD wallet for user ID {$userId} (Account ID: {$accountId}). Error: {$errorMessage}. Manual intervention may be required.";
+
+        return $this->createNotification($admin, 'system', $title, $message, [
+            'action' => 'admin_wallet_creation_failed',
+            'account_id' => $accountId,
+            'user_id' => $userId,
+            'error' => $errorMessage,
+        ]);
+    }
+
 
     /**
      * Notify user when deposit is initiated
