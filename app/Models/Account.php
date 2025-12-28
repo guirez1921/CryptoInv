@@ -14,6 +14,7 @@ class Account extends Model
         'total_deposits', 'total_withdrawals',
         'unrealized_pnl', 'realized_pnl',
         'last_activity_at', 'is_active', 'account_type',
+        'demo_balance',
     ];
 
     public function user():BelongsTo

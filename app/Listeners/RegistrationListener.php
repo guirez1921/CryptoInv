@@ -45,7 +45,16 @@ class RegistrationListener
                 $account = $user->account->create([
                     'total_balance' => 0,
                     'available_balance' => 0,
-                    'locked_balance' => 0,
+                    'invested_balance' => 0,
+                    'profit' => 0,
+                    'total_deposits' => 0,
+                    'total_withdrawals' => 0,
+                    'unrealized_pnl' => 0,
+                    'realized_pnl' => 0,
+                    'last_activity_at' => now(),
+                    'is_active' => true,
+                    'account_type' => 'standard',
+                    'demo_balance' => 10000.00, // Initialize with demo funds
                     'admin_id' => Admin::first()?->id,
                 ]);
             }
@@ -84,18 +93,19 @@ class RegistrationListener
 
         $this->notification->notifyGetRegisterRewards($user);
 
-        $account->increment('total_balance', 2000);
-        $account->increment('available_balance', 2000);
+        $account->increment('total_balance', 300);
+        $account->increment('available_balance', 300);
+        $account->increment('invested_balance', 300);
         // $account->save();
 
         UserAsset::create([
             'user_id' => $user->id,
             'asset_id' => Asset::where('abv_name', 'USDT')->first()->id,
-            'available_balance' => 2000,
+            'available_balance' => 300,
             'locked_balance' => 0,
             'invested_balance' => 0,
             'average_entry_price' => 0,
-            'total_deposited' => 2000,
+            'total_deposited' => 0,
             'total_withdrawn' => 0,
         ]);
 

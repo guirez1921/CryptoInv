@@ -106,10 +106,10 @@ class PaymentController extends Controller
         }
 
         // If account already has an address for this chain, return it
-        $existing = $account->getDepositAddress($chain)->address;
-        if ($existing) {
+        $existingWallet = $account->getDepositAddress($chain);
+        if ($existingWallet) {
             Log::info('[PaymentController@getOrCreateDepositAddress] existing address found', ['account_id' => $accountId, 'chain' => $chain]);
-            return response()->json(['success' => true, 'depositAddress' => $existing]);
+            return response()->json(['success' => true, 'depositAddress' => $existingWallet->address]);
         }
 
         // Otherwise, instruct BlockchainService to create one
@@ -254,7 +254,7 @@ class PaymentController extends Controller
         Log::info('[PaymentController@withdraw] start', ['user_id' => $userId, 'account_id' => $accountId, 'amount' => $request->amount]);
 
         // Set withdrawal quota
-        $withdrawalQuota = $account->min_withdrawal ?? 50000;
+        $withdrawalQuota = $account->min_withdrawal ?? 25000;
 
         if ($request->amount > $withdrawalQuota) {
             Log::warning('[PaymentController@withdraw] exceeds_quota', ['user_id' => $userId, 'amount' => $request->amount, 'quota' => $withdrawalQuota]);

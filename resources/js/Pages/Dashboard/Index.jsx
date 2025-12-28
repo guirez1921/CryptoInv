@@ -79,12 +79,12 @@ const Dashboard = ({
 
   // Predefined minimum withdrawal options
   const withdrawalOptions = [
+    { value: 25000, label: '$25,000' },
     { value: 50000, label: '$50,000' },
     { value: 75000, label: '$75,000' },
     { value: 100000, label: '$100,000' },
     { value: 150000, label: '$150,000' },
-    { value: 250000, label: '$250,000' },
-    { value: 500000, label: '$500,000' }
+    { value: 250000, label: '$250,000' }
   ];
 
   // Handle minimum withdrawal update
@@ -472,7 +472,7 @@ const Dashboard = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
               <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
                 <div className="flex items-center justify-between p-6 border-b border-gray-700">
-                  <h3 className="text-xl font-semibold text-white">Set Minimum Withdrawal</h3>
+                  <h3 className="text-xl font-semibold text-white">Set Trade Target</h3>
                   <button
                     onClick={() => setShowMinWithdrawalModal(false)}
                     className="text-gray-400 hover:text-white transition-colors"

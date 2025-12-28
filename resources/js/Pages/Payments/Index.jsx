@@ -18,6 +18,7 @@ import QRCodeLib from 'qrcode';
 import CryptoAIAuthLayout from '@/Layouts/CryptoAIAuthLayout';
 import Card from '@/component/UI/Card';
 import Button from '@/component/UI/Button';
+import Modal from '@/component/UI/Modal';
 
 const PaymentIndex = () => {
   const { history, totals, user, account, accountId } = usePage().props;
@@ -38,7 +39,7 @@ const PaymentIndex = () => {
 
   // Get data from props
   const availableBalance = account?.balance || 0;
-  const [minimumWithdrawal, setMinimumWithdrawal] = useState(50000);
+  const [minimumWithdrawal, setMinimumWithdrawal] = useState(25000);
   const canWithdraw = availableBalance >= minimumWithdrawal;
 
   // Fetch minimum withdrawal from server on mount
@@ -50,11 +51,11 @@ const PaymentIndex = () => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         console.log(data);
-        const val = data.min_withdrawal ?? data.minWithdrawal ?? data.min ?? 50000;
+        const val = data.min_withdrawal ?? data.minWithdrawal ?? data.min ?? 25000;
         if (mounted) setMinimumWithdrawal(Number(val));
       } catch (err) {
         console.error('Error fetching minimum withdrawal:', err);
-        // keep default fallback of 50000
+        // keep default fallback of 25000
       }
     };
     fetchMin();
@@ -519,7 +520,7 @@ const PaymentIndex = () => {
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
                   {getSelectedChainData() && (
-                      <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       Minimum deposit: ${Number(getSelectedChainData().minDeposit || 10).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   )}
@@ -544,46 +545,45 @@ const PaymentIndex = () => {
                       Deposit Address ({getSelectedChainData()?.symbol})
                     </label>
                     <div className="bg-gray-700/50 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <code className="text-cyan-400 text-sm break-all">
-                          {depositAddress}
-                        </code>
-                        <div className="flex space-x-2">
+                      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-3">
+                        <div className="flex-1 w-full">
+                          <p className="text-xs text-gray-400 mb-1">Deposit Address</p>
+                          <code className="text-cyan-400 text-sm break-all font-mono bg-gray-900/50 px-3 py-2 rounded block w-full select-all border border-gray-700/50">
+                            {depositAddress}
+                          </code>
+                        </div>
+                        <div className="flex space-x-2 w-full sm:w-auto">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={handleCopyAddress}
-                            className="flex-shrink-0"
+                            className="flex-1 sm:flex-none justify-center"
+                            title="Copy Address"
                           >
                             {copied ? (
-                              <CheckCircle className="w-4 h-4" />
+                              <>
+                                <CheckCircle className="w-4 h-4 text-green-400 mr-2 sm:mr-0" />
+                                <span className="sm:hidden">Copied</span>
+                              </>
                             ) : (
-                              <Copy className="w-4 h-4" />
+                              <>
+                                <Copy className="w-4 h-4 mr-2 sm:mr-0" />
+                                <span className="sm:hidden">Copy</span>
+                              </>
                             )}
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setShowQRCode(!showQRCode)}
-                            className="flex-shrink-0"
+                            onClick={() => setShowQRCode(true)}
+                            className="flex-1 sm:flex-none justify-center bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-500/30"
+                            title="Show QR Code"
                           >
-                            <QrCode className="w-4 h-4" />
+                            <QrCode className="w-4 h-4 mr-2 sm:mr-0" />
+                            <span className="sm:hidden">QR Code</span>
                           </Button>
                         </div>
                       </div>
-
-                      {showQRCode && depositAddress && (
-                        <div className="text-center p-4 bg-white rounded-lg">
-                          <div className="w-40 h-40 mx-auto bg-white rounded-lg flex items-center justify-center">
-                            {qrDataUrl ? (
-                              <img src={qrDataUrl} alt={`QR for ${depositAddress}`} className="w-40 h-40 object-contain" />
-                            ) : (
-                              <div className="text-gray-500">Generating...</div>
-                            )}
-                          </div>
-                          <p className="text-gray-800 text-xs mt-2 break-all">QR Code for: {depositAddress}</p>
-                        </div>
-                      )}
                     </div>
 
                     <Button
@@ -642,11 +642,11 @@ const PaymentIndex = () => {
                       </option>
                     ))}
                   </select>
-                  
+
                   {/* persist withdraw chain selection */}
                   {/* NOTE: we attach an onChange above; to persist we handle it below by reading withdrawChain change elsewhere */}
                   {getWithdrawChainData() && (
-                      <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       Withdrawal fee: {getWithdrawChainData() && typeof getWithdrawChainData().withdrawalFee !== 'undefined' ? Number(getWithdrawChainData().withdrawalFee).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} {getWithdrawChainData()?.symbol}
                     </p>
                   )}
@@ -788,6 +788,65 @@ const PaymentIndex = () => {
           </Card>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      <Modal
+        isOpen={showQRCode}
+        onClose={() => setShowQRCode(false)}
+        title="Deposit QR Code"
+        maxWidth="max-w-sm"
+      >
+        <div className="flex flex-col items-center">
+          <div className="bg-white p-4 rounded-xl shadow-lg mb-4">
+            {qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                alt="Deposit QR Code"
+                className="w-48 h-48 object-contain"
+              />
+            ) : (
+              <div className="w-48 h-48 flex items-center justify-center text-gray-400">
+                <span className="animate-pulse">Generating...</span>
+              </div>
+            )}
+          </div>
+
+          <p className="text-sm text-gray-400 mb-2 text-center">
+            Scan to deposit <span className="font-bold text-white">{getSelectedChainData()?.symbol}</span>
+          </p>
+
+          <div className="w-full bg-gray-900/50 p-3 rounded-lg border border-gray-700 break-all text-center">
+            <code className="text-cyan-400 text-xs font-mono">{depositAddress}</code>
+          </div>
+
+          <div className="mt-6 flex w-full space-x-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={handleCopyAddress}
+            >
+              {copied ? (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2 text-green-400" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy Address
+                </>
+              )}
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => setShowQRCode(false)}
+            >
+              Done
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
     </CryptoAIAuthLayout>
   );
 };

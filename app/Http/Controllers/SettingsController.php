@@ -29,7 +29,7 @@ class SettingsController extends Controller
     public function updateMinWithdrawal(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'min_withdrawal' => 'required|numeric|min:50000|max:500000|in:50000,75000,100000,150000,250000,500000'
+            'min_withdrawal' => 'required|numeric|min:25000|max:500000|in:25000,50000,75000,100000,150000,250000,500000'
         ]);
 
         if ($validator->fails()) {

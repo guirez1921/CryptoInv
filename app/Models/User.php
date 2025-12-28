@@ -136,6 +136,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->account?->admin;
     }
 
+    // Accessor for user balance to sync with header
+    public function getBalanceAttribute()
+    {
+        return $this->account?->available_balance ?? 0;
+    }
+
     // Get users under this admin
     public function managedUsers(): User|Collection
     {
