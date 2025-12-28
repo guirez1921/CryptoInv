@@ -18,7 +18,7 @@ class AdminFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory()->admin(), // create user + set is_admin true
+            'user_id' => User::factory(), // create user
         ];
     }
 }

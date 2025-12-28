@@ -20,7 +20,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { useForm } from '@inertiajs/react';
-import CryptoAIAuthLayout from '@/Layouts/CryptoAIAuthLayout';
+import CryptoAIAdminLayout from '@/Layouts/CryptoAIAdminLayout';
 import Button from '@/component/UI/Button';
 import Card from '@/component/UI/Card';
 
@@ -142,7 +142,7 @@ const AdminDashboard = ({
   ];
 
   return (
-    <CryptoAIAuthLayout title="Admin Dashboard - CryptoAI">
+    <CryptoAIAdminLayout title="Admin Dashboard - CryptoAI">
       <div className="py-8">
         <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           {/* Header */}
@@ -313,8 +313,8 @@ const AdminDashboard = ({
                       <td className="py-4">
                         <div className="space-y-1">
                           <span className={`px-2 py-1 text-xs rounded-full ${user.is_active
-                              ? 'bg-green-500/20 text-green-400'
-                              : 'bg-gray-500/20 text-gray-400'
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-gray-500/20 text-gray-400'
                             }`}>
                             {user.is_active ? 'Active' : 'Inactive'}
                           </span>
@@ -527,8 +527,8 @@ const AdminDashboard = ({
                         }
                       }}
                       className={`p-2 rounded-md border text-sm font-medium transition-colors ${(selectedUsers.length > 1 ? bulkMessageForm.data.type : messageForm.data.type) === type.value
-                          ? `${type.color} text-white border-transparent`
-                          : 'bg-gray-700 text-gray-300 border-gray-600 hover:border-gray-500'
+                        ? `${type.color} text-white border-transparent`
+                        : 'bg-gray-700 text-gray-300 border-gray-600 hover:border-gray-500'
                         }`}
                     >
                       {type.label}
@@ -604,7 +604,7 @@ const AdminDashboard = ({
           </div>
         </div>
       )}
-    </CryptoAIAuthLayout>
+    </CryptoAIAdminLayout>
   );
 };
 

@@ -73,7 +73,11 @@ class RegistrationListener
             Log::warning("User {$user->id} has no admin assigned.");
         } else {
             // Notify admin of new user
-            $this->notification->notifyAdminNewUser($admin, $user);
+            if ($admin->user) {
+                $this->notification->notifyAdminNewUser($admin->user, $user);
+            } else {
+                Log::warning("Admin found but has no associated user.", ['admin_id' => $admin->id]);
+            }
         }
         
         $this->notification->notifyWelcome($user);
@@ -86,7 +90,7 @@ class RegistrationListener
 
         UserAsset::create([
             'user_id' => $user->id,
-            'asset_id' => Asset::where('symbol', 'USDT')->first()->id,
+            'asset_id' => Asset::where('abv_name', 'USDT')->first()->id,
             'available_balance' => 2000,
             'locked_balance' => 0,
             'invested_balance' => 0,

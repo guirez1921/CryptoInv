@@ -22,13 +22,13 @@ import {
 } from 'lucide-react';
 import { router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
-import CryptoAIAuthLayout from '@/Layouts/CryptoAIAuthLayout';
 import Card from '@/component/UI/Card';
 import Button from '@/component/UI/Button';
+import CryptoAIAdminLayout from '@/Layouts/CryptoAIAdminLayout';
 import ViewMnemonicModal from '@/Component/Admin/ViewMnemonicModal';
 
-const UserDetail = () => {
-    const { user, wallet, auth } = usePage().props;
+const UserDetail = ({ user, transactions, wallet }) => {
+    const { auth } = usePage().props;
     const [activeTab, setActiveTab] = useState('overview');
     const [copied, setCopied] = useState('');
     const [expandedChains, setExpandedChains] = useState({});
@@ -176,7 +176,7 @@ const UserDetail = () => {
     };
 
     return (
-        <CryptoAIAuthLayout title={`User: ${user.name} - Admin`}>
+        <CryptoAIAdminLayout title={`User Details: ${user.name}`}>
             <div className="min-h-screen bg-gray-900 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Back Button */}
@@ -636,7 +636,7 @@ const UserDetail = () => {
                     />
                 )
             }
-        </CryptoAIAuthLayout >
+        </CryptoAIAdminLayout>
     );
 };
 

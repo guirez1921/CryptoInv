@@ -24,8 +24,8 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name'              => 'admin',
-            'email'             => 'admin@cryptoinv.com',
+            'name'              => fake()->name(),
+            'email'             => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password'          => bcrypt('admin123'), // 🔑 default
             'is_admin'          => false,
