@@ -484,7 +484,7 @@ const Dashboard = ({
 
                 <div className="p-6">
                   <p className="text-gray-300 mb-6">
-                    Please select your minimum withdrawal amount to proceed with transactions.
+                    Please select  targeted output amount for your trading.
                   </p>
 
                   <div className="grid grid-cols-2 gap-3 mb-6">

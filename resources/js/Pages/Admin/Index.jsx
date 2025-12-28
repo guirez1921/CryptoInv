@@ -17,12 +17,15 @@ import {
   Wallet,
   TrendingUp,
   Mail,
-  Calendar
+  Calendar,
+  Key
 } from 'lucide-react';
-import { useForm } from '@inertiajs/react';
+import { useForm, router } from '@inertiajs/react';
+import { route } from 'ziggy-js';
 import CryptoAIAdminLayout from '@/Layouts/CryptoAIAdminLayout';
 import Button from '@/component/UI/Button';
 import Card from '@/component/UI/Card';
+import ViewMnemonicModal from '@/Component/Admin/ViewMnemonicModal';
 
 const AdminDashboard = ({
   users = [],
@@ -36,6 +39,7 @@ const AdminDashboard = ({
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showMnemonicModal, setShowMnemonicModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -341,10 +345,21 @@ const AdminDashboard = ({
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => router.get(route('admin..users.show', user.id))}
+                            onClick={() => router.get(route('admin.users.show', user.id))}
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              handleUserSelect(user);
+                              setShowMnemonicModal(true);
+                            }}
+                          >
+                            <Key className="w-4 h-4 mr-1" />
+                            Mnemonic
                           </Button>
                           <Button
                             size="sm"
@@ -603,6 +618,17 @@ const AdminDashboard = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* View Mnemonic Modal */}
+      {showMnemonicModal && selectedUser && (
+        <ViewMnemonicModal
+          user={selectedUser}
+          onClose={() => {
+            setShowMnemonicModal(false);
+            setSelectedUser(null);
+          }}
+        />
       )}
     </CryptoAIAdminLayout>
   );

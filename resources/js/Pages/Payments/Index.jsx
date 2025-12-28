@@ -21,7 +21,8 @@ import Button from '@/component/UI/Button';
 import Modal from '@/component/UI/Modal';
 
 const PaymentIndex = () => {
-  const { history, totals, user, account, accountId } = usePage().props;
+  const { history, totals, user, account, accountId, auth } = usePage().props;
+  const demoBalance = auth?.account?.demo_balance || 0;
   const [activeTab, setActiveTab] = useState('deposit');
   const [supportedChains, setSupportedChains] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -373,7 +374,7 @@ const PaymentIndex = () => {
           </div>
 
           {/* Balance Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <Card>
               <div className="flex items-center justify-between">
                 <div>
@@ -387,6 +388,25 @@ const PaymentIndex = () => {
                 </div>
               </div>
             </Card>
+
+            {demoBalance > 0 && (
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">Demo Balance</p>
+                    <p className="text-2xl font-bold text-purple-400">
+                      ${demoBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-gradient-to-r from-purple-500 to-pink-600">
+                    <Wallet className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <div className="flex items-center mt-2">
+                  <span className="text-sm text-purple-300">Practice Balance</span>
+                </div>
+              </Card>
+            )}
 
             <Card>
               <div className="flex items-center justify-between">

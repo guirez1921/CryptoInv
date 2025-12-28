@@ -40,6 +40,10 @@ class HandleInertiaRequests extends Middleware
         'auth' => [
             'user' => Auth::user(),
             'balance' => Auth::user()?->balance,
+            'account' => Auth::user()?->account ? [
+                'available_balance' => Auth::user()->account->available_balance ?? 0,
+                'demo_balance' => Auth::user()->account->demo_balance ?? 0,
+            ] : null,
             'notificationCount' => Auth::user()?->notifications()->where('is_read', false)->count(),
         ],
     ]);
