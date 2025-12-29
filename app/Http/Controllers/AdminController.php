@@ -415,7 +415,7 @@ class AdminController extends Controller
                     'invested_balance' => $user->account->invested_balance,
                     'profit_loss' => $user->account->profit_loss,
                 ] : null,
-                'recent_transactions' => $user->account->transactions->map(function ($transaction) {
+                'recent_transactions' => ($user->account?->transactions ?? collect())->map(function ($transaction) {
                     return [
                         'id' => $transaction->id,
                         'type' => $transaction->type,

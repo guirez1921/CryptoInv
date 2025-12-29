@@ -24,10 +24,10 @@ class DashboardController extends Controller
         $user = Auth::user();
         $account = $user->account;
 
-        $total_balance = $account->total_balance;
-        $invested_balance = $account->invested_balance;
-        $profit = $account->profit;
-        $available_balance = $account->available_balance;
+        $total_balance = $account?->total_balance ?? 0;
+        $invested_balance = $account?->invested_balance ?? 0;
+        $profit = $account?->profit ?? 0;
+        $available_balance = $account?->available_balance ?? 0;
 
         $total_balance_change = 0;
         $profit_change = 0;

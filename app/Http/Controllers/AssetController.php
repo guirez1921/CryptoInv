@@ -18,7 +18,7 @@ class AssetController extends Controller
 
         $total_trade_amount = $trades->sum(fn($trade) => $trade->amount ?? 0);
         $total_profit_loss = $trades->sum(fn($trade) => $trade->profit_loss ?? 0);
-        $total_portfolio_value = $account->balance + $total_profit_loss;
+        $total_portfolio_value = ($account?->total_balance ?? 0) + $total_profit_loss;
 
         $performance_metric_monthly = $this->calculatePerformanceMetric($trades, 30);
 
