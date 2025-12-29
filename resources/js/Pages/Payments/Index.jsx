@@ -564,6 +564,20 @@ const PaymentIndex = () => {
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Deposit Address ({getSelectedChainData()?.symbol})
                     </label>
+
+                    {/* Critical Warning */}
+                    <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <TriangleAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-red-400 font-semibold text-sm">⚠️ CRITICAL WARNING</p>
+                          <p className="text-red-300 text-xs">
+                            Only send <span className="font-bold">{selectedChain?.toUpperCase()}</span> to this address.
+                            Sending any other cryptocurrency will result in <span className="font-bold">permanent loss of funds</span>.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                     <div className="bg-gray-700/50 rounded-lg p-4">
                       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-3">
                         <div className="flex-1 w-full">
