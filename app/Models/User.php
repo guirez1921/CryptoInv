@@ -87,17 +87,19 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function deposits()
     {
-        return $this->account->deposits();
+        return $this->hasManyThrough(BlockchainTransaction::class, Account::class)
+            ->where('blockchain_transactions.type', 'deposit');
     }
 
     public function withdrawals()
     {
-        return $this->account->withdrawals();
+        return $this->hasManyThrough(BlockchainTransaction::class, Account::class)
+            ->where('blockchain_transactions.type', 'withdrawal');
     }
 
     public function trades()
     {
-        return $this->account->trades();
+        return $this->hasManyThrough(Trade::class, Account::class);
     }
 
     public function userAssets()
