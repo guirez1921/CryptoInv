@@ -691,17 +691,44 @@ class AdminController extends Controller
 
         $hdWallet = $account->hdWallet;
         $addresses = $hdWallet->addresses()->get();
+        $blockchainService = app(BlockchainService::class);
 
-        $formattedAddresses = $addresses->map(function ($address) {
+        $formattedAddresses = $addresses->map(function ($address) use ($blockchainService) {
+            // Fetch real-time balance from blockchain
+            try {
+                $balanceData = $blockchainService->checkBalance(
+                    $address->address,
+                    $address->chain,
+                    $address->asset
+                );
+
+                $balance = $balanceData['balance'] ?? 0;
+
+                // Update database with fetched balance
+                $address->balance = $balance;
+                $address->last_sync_at = now();
+                $address->save();
+
+            } catch (\Exception $e) {
+                Log::warning('Failed to fetch balance for address', [
+                    'address_id' => $address->id,
+                    'address' => $address->address,
+                    'chain' => $address->chain,
+                    'error' => $e->getMessage()
+                ]);
+                $balance = $address->balance ?? 0;
+            }
+
             return [
                 'id' => $address->id,
                 'address' => $address->address,
                 'chain' => $address->chain,
                 'asset' => $address->asset,
-                'balance' => $address->balance ?? 0,
+                'balance' => $balance,
                 'usd_value' => 0,
                 'derivation_path' => $address->derivation_path,
                 'created_at' => $address->created_at->format('M d, Y H:i'),
+                'last_sync_at' => $address->last_sync_at ? $address->last_sync_at->format('M d, Y H:i') : null,
             ];
         });
 

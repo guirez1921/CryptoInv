@@ -96,17 +96,13 @@ class HDWalletDB {
           return decrypted;
         }
       } catch (legacyErr) {
-        // ignore and attempt recovery below
+        // Both decryption methods failed - this is a critical error
+        console.error(`Critical: Failed to decrypt seed for wallet ${walletId}`);
+        throw new Error(`Unable to decrypt wallet seed. Encryption key may be incorrect or seed data corrupted. DO NOT regenerate - contact support.`);
       }
 
-      // If we reach here, decryption failed. Recover by generating a new mnemonic, storing it, and returning it.
-      // NOTE: This will rotate the seed for the wallet and may orphan addresses derived from the old seed.
-      // Log to stderr to make the event visible in runner output.
-      // console.error(`Failed to decrypt seed for wallet ${walletId}. Rotating to a new mnemonic.`);
-      const newMnemonic = bip39.generateMnemonic();
-      const newEncrypted = encrypt(newMnemonic);
-      await pool.execute('UPDATE hd_wallets SET encrypted_seed = ? WHERE id = ?', [newEncrypted, walletId]);
-      return newMnemonic;
+      // If modern decrypt failed but no legacy method available
+      throw new Error(`Unable to decrypt wallet seed. Encryption key may be incorrect or seed data corrupted.`);
     }
   }
 
