@@ -176,10 +176,9 @@ const UserDetail = ({ user, transactions, wallet }) => {
     };
 
     return (
-        <CryptoAIAdminLayout title={`User Details: ${user.name}`}>
-            <div className="min-h-screen bg-gray-900 py-8">
+        <CryptoAIAdminLayout title={`${user.name} - User Details`}>
+            <div className="py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {/* Back Button */}
                     <Button
                         variant="outline"
                         size="sm"
@@ -265,7 +264,7 @@ const UserDetail = ({ user, transactions, wallet }) => {
                                     <div>
                                         <p className="text-sm text-gray-400">Total Balance</p>
                                         <p className="text-2xl font-bold text-white">
-                                            ${user.account.total_balance?.toLocaleString() || '0.00'}
+                                            ${(user.account.total_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <DollarSign className="w-10 h-10 text-cyan-400" />
@@ -277,7 +276,7 @@ const UserDetail = ({ user, transactions, wallet }) => {
                                     <div>
                                         <p className="text-sm text-gray-400">Available</p>
                                         <p className="text-2xl font-bold text-green-400">
-                                            ${user.account.available_balance?.toLocaleString() || '0.00'}
+                                            ${(user.account.available_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     <Wallet className="w-10 h-10 text-green-400" />

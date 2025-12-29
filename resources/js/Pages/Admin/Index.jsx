@@ -273,7 +273,7 @@ const AdminDashboard = ({
             </div>
 
             {/* Users Table */}
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-6 md:mx-0">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-700">
@@ -333,17 +333,17 @@ const AdminDashboard = ({
                       </td>
                       <td className="py-4">
                         <div className="text-white font-semibold">
-                          ${user.total_balance?.toLocaleString() || '0.00'}
+                          ${(user.total_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                         <div className="text-gray-400 text-sm">
-                          Available: ${user.available_balance?.toLocaleString() || '0.00'}
+                          Available: ${(user.available_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                       </td>
                       <td className="py-4 text-gray-400">
                         {new Date(user.created_at).toLocaleDateString()}
                       </td>
                       <td className="py-4">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Button
                             size="sm"
                             variant="outline"

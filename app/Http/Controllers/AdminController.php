@@ -9,6 +9,7 @@ use App\Models\BlockchainTransaction;
 use App\Models\Chat;
 use App\Models\UserMessage;
 use App\Models\Notification;
+use App\Services\BlockchainService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
