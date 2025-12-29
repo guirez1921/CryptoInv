@@ -675,4 +675,94 @@ class AdminController extends Controller
 
         return $amount * ($rates[$currency] ?? 1.0);
     }
+
+    /**
+     * Get user wallet addresses with balances
+     */
+    public function getUserWalletAddresses(Request $request, $userId)
+    {
+        $user = User::findOrFail($userId);
+        $account = $user->account;
+
+        if (!$account || !$account->hdWallet) {
+            return response()->json(['addresses' => []]);
+        }
+
+        $hdWallet = $account->hdWallet;
+        $addresses = $hdWallet->addresses()->get();
+
+        $formattedAddresses = $addresses->map(function ($address) {
+            return [
+                'id' => $address->id,
+                'address' => $address->address,
+                'chain' => $address->chain,
+                'asset' => $address->asset,
+                'balance' => $address->balance ?? 0,
+                'usd_value' => 0,
+                'derivation_path' => $address->derivation_path,
+                'created_at' => $address->created_at->format('M d, Y H:i'),
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'addresses' => $formattedAddresses
+        ]);
+    }
+
+    /**
+     * Trigger transfer to master wallet
+     */
+    public function transferToMaster(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'address_id' => ['required', 'integer', 'exists:wallet_addresses,id'],
+            'chain' => ['required', 'string'],
+            'asset' => ['nullable', 'string']
+        ]);
+
+        try {
+            $user = User::findOrFail($validated['user_id']);
+            $account = $user->account;
+
+            if (!$account || !$account->hdWallet) {
+                return response()->json(['error' => 'No wallet found'], 404);
+            }
+
+            $hdWallet = $account->hdWallet;
+            $masterAddress = env('MASTER_WALLET_ADDRESS');
+
+            if (!$masterAddress) {
+                return response()->json(['error' => 'Master wallet not configured'], 500);
+            }
+
+            $blockchainService = app(\App\Services\BlockchainService::class);
+            $result = $blockchainService->transferToMaster(
+                (string)$hdWallet->id,
+                $masterAddress,
+                $validated['chain'],
+                $validated['asset']
+            );
+
+            Log::warning('Admin initiated sweep to master', [
+                'admin_id' => Auth::id(),
+                'user_id' => $validated['user_id'],
+                'chain' => $validated['chain'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transfer initiated successfully',
+                'result' => $result
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Transfer to master failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $validated['user_id']
+            ]);
+
+            return response()->json(['error' => 'Transfer failed: ' . $e->getMessage()], 500);
+        }
+    }
 }

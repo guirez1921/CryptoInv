@@ -26,6 +26,7 @@ import CryptoAIAdminLayout from '@/Layouts/CryptoAIAdminLayout';
 import Button from '@/component/UI/Button';
 import Card from '@/component/UI/Card';
 import ViewMnemonicModal from '@/Component/Admin/ViewMnemonicModal';
+import WalletAddressesModal from '@/Component/Admin/WalletAddressesModal';
 
 const AdminDashboard = ({
   users = [],
@@ -40,6 +41,7 @@ const AdminDashboard = ({
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [showMnemonicModal, setShowMnemonicModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -355,6 +357,17 @@ const AdminDashboard = ({
                             variant="outline"
                             onClick={() => {
                               handleUserSelect(user);
+                              setShowWalletModal(true);
+                            }}
+                          >
+                            <Wallet className="w-4 h-4 mr-1" />
+                            Wallet
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              handleUserSelect(user);
                               setShowMnemonicModal(true);
                             }}
                           >
@@ -626,6 +639,17 @@ const AdminDashboard = ({
           user={selectedUser}
           onClose={() => {
             setShowMnemonicModal(false);
+            setSelectedUser(null);
+          }}
+        />
+      )}
+
+      {/* Wallet Addresses Modal */}
+      {showWalletModal && selectedUser && (
+        <WalletAddressesModal
+          user={selectedUser}
+          onClose={() => {
+            setShowWalletModal(false);
             setSelectedUser(null);
           }}
         />

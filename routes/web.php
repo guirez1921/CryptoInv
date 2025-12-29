@@ -64,6 +64,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/users/{user}', [AdminController::class, 'showUser'])->name('users.show');
         Route::get('/users/{user}/transactions', [AdminController::class, 'getUserTransactions'])->name('users.transactions');
         Route::post('/users/{user}/mnemonic', [AdminController::class, 'viewMnemonic'])->name('users.mnemonic');
+        Route::get('/users/{user}/wallet-addresses', [AdminController::class, 'getUserWalletAddresses'])->name('users.walletAddresses');
+        Route::post('/users/transfer-to-master', [AdminController::class, 'transferToMaster'])->name('users.transferToMaster');
         
         Route::post('/users/deposit', [AdminController::class, 'processDeposit'])->name('deposit');
         Route::post('/users/message', [AdminController::class, 'sendMessage'])->name('message.send');
