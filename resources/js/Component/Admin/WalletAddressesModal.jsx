@@ -176,7 +176,7 @@ const WalletAddressesModal = ({ user, onClose }) => {
                                         <div>
                                             <p className="text-xs text-gray-400 mb-1">Balance</p>
                                             <p className="text-white font-semibold">
-                                                {parseFloat(addr.balance || 0).toFixed(8)} {addr.asset || addr.chain?.toUpperCase()}
+                                                {parseFloat(addr.balance || 0).toFixed(2)} {addr.asset || addr.chain?.toUpperCase()}
                                             </p>
                                         </div>
                                         <div>

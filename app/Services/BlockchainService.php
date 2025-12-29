@@ -113,17 +113,32 @@ class BlockchainService
         throw new \Exception('Failed to retrieve mnemonic');
     }
 
-    public function transferToMaster(string $fromWalletId, string $toMasterAddress, string $chain, ?string $assetId = null)
+
+    public function transferToMaster(string $hdWalletId, string $chain, ?string $assetId = null)
     {
-        // Runner expects: [from, to, chain, assetId]
-        // NO AMOUNT (Sweep Mode)
-        $args = [$fromWalletId, $toMasterAddress, $chain, $assetId];
+        // Get master wallet address based on chain
+        $chainUpper = strtoupper($chain);
+        $masterAddress = env("MASTER_WALLET_{$chainUpper}");
         
-        Log::info('[BlockchainService] transferToMaster', ['from' => $fromWalletId, 'to' => $toMasterAddress, 'chain' => $chain, 'assetId' => $assetId]);
+        if (!$masterAddress) {
+            throw new \Exception("Master wallet not configured for chain: {$chain}");
+        }
+
+        // Logic to construct args safely for runner: [hdWalletId, masterAddress, chain, assetId]
+        // NO AMOUNT (Sweep Mode)
+        $args = [$hdWalletId, $masterAddress, $chain, $assetId];
+        
+        Log::info('[BlockchainService] transferToMaster', [
+            'hdWalletId' => $hdWalletId,
+            'masterAddress' => $masterAddress,
+            'chain' => $chain,
+            'assetId' => $assetId
+        ]);
         $res = $this->runNode('transferToMaster', $args);
         Log::debug('[BlockchainService] transferToMaster result', ['result' => $res]);
         return $res;
     }
+
 
     public function getWalletDetails(string $walletId)
     {

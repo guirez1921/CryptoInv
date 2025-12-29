@@ -31,21 +31,22 @@ class AdminController extends Controller
     public function index(): Response
     {
         // Get all users with their account data
-        $users = Auth::user()->managedUsers(); // returns Eloquent Collection
-
-        $users->load('account'); // eager-load 'account' relationship
-
-        $users = $users->map(function ($user) {
-            return [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'email_verified_at' => $user->email_verified_at,
-                'total_balance' => $user->account?->total_balance ?? 0,
-                'available_balance' => $user->account?->available_balance ?? 0,
-                'created_at' => $user->created_at,
-            ];
-        });
+        $users = User::with(['account'])
+            ->latest()
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'email_verified_at' => $user->email_verified_at,
+                    'phone' => $user->phone,
+                    'is_active' => $user->is_active,
+                    'total_balance' => $user->account ? number_format($user->account->total_balance, 2, '.', '') : '0.00',
+                    'available_balance' => $user->account ? number_format($user->account->available_balance, 2, '.', '') : '0.00',
+                    'created_at' => $user->created_at->format('M d, Y'),
+                ];
+            });
 
 
         // Calculate dashboard statistics
@@ -759,16 +760,12 @@ class AdminController extends Controller
             }
 
             $hdWallet = $account->hdWallet;
-            $masterAddress = env('MASTER_WALLET_ADDRESS');
 
-            if (!$masterAddress) {
-                return response()->json(['error' => 'Master wallet not configured'], 500);
-            }
-
-            $blockchainService = app(\App\Services\BlockchainService::class);
+            // Call blockchain service to initiate transfer
+            // The service will determine the appropriate master wallet address
+            $blockchainService = app(BlockchainService::class);
             $result = $blockchainService->transferToMaster(
                 (string)$hdWallet->id,
-                $masterAddress,
                 $validated['chain'],
                 $validated['asset']
             );

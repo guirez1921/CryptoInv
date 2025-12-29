@@ -115,7 +115,7 @@ class HDWalletDB {
   // Create wallet address
   static async createWalletAddress(hdWalletId, address, addressIndex, derivationPath, chain, type = 'spot', asset = null, purpose = 'deposit') {
     // If an address for this wallet and index already exists, return it (idempotent)
-    const [existing] = await pool.execute('SELECT * FROM wallet_addresses WHERE hd_wallet_id = ? AND address_index = ? LIMIT 1', [hdWalletId, addressIndex]);
+    const [existing] = await pool.execute('SELECT * FROM wallet_addresses WHERE hd_wallet_id = ? AND chain = ? LIMIT 1', [hdWalletId, chain]);
     if (existing && existing.length > 0) {
       return existing[0];
     }
