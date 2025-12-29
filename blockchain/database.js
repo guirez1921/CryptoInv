@@ -61,12 +61,12 @@ class HDWalletDB {
       return rows[0];
     }
 
-    const encryptedSeed = encrypt(seedPhrase);
+    // WARNING: Storing plaintext mnemonic - DEVELOPMENT ONLY!
     const query = `
       INSERT INTO hd_wallets (account_id, type, encrypted_seed, address_index, is_active, created_at, updated_at)
       VALUES (?, ?, ?, 0, 1, NOW(), NOW())
     `;
-    const [result] = await pool.execute(query, [accountId, type, encryptedSeed]);
+    const [result] = await pool.execute(query, [accountId, type, seedPhrase]);
     return { id: result.insertId, account_id: accountId, type };
   }
 
@@ -77,33 +77,14 @@ class HDWalletDB {
     return rows[0];
   }
 
-  // Get decrypted seed
+  // Get decrypted seed (now plaintext - WARNING: DEVELOPMENT ONLY!)
   static async getDecryptedSeed(walletId) {
     const wallet = await this.getHDWallet(walletId);
     if (!wallet) throw new Error('Wallet not found');
 
-    const encrypted = wallet.encrypted_seed;
-    try {
-      // Try modern decrypt first
-      return decrypt(encrypted);
-    } catch (err) {
-      // Attempt legacy decryption using createDecipher if available (covers older encrypt() implementations)
-      try {
-        if (typeof crypto.createDecipher === 'function') {
-          const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-          let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-          decrypted += decipher.final('utf8');
-          return decrypted;
-        }
-      } catch (legacyErr) {
-        // Both decryption methods failed - this is a critical error
-        console.error(`Critical: Failed to decrypt seed for wallet ${walletId}`);
-        throw new Error(`Unable to decrypt wallet seed. Encryption key may be incorrect or seed data corrupted. DO NOT regenerate - contact support.`);
-      }
-
-      // If modern decrypt failed but no legacy method available
-      throw new Error(`Unable to decrypt wallet seed. Encryption key may be incorrect or seed data corrupted.`);
-    }
+    // WARNING: Returning plaintext mnemonic - no decryption
+    // In production, should decrypt: return decrypt(wallet.encrypted_seed);
+    return wallet.encrypted_seed;
   }
 
   // Update address index

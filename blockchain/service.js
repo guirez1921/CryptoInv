@@ -112,6 +112,22 @@ const SUPPORTED_WALLETS = {
 };
 
 class WalletService {
+    /**
+     * Get master wallet address for a given chain
+     * @param {string} chain - Chain name (ethereum, bitcoin, solana, etc.)
+     * @returns {string} Master wallet address from environment
+     */
+    static getMasterWallet(chain) {
+        const chainUpper = chain.toUpperCase();
+        const masterAddress = process.env[`MASTER_WALLET_${chainUpper}`];
+
+        if (!masterAddress) {
+            throw new Error(`Master wallet not configured for chain: ${chain}`);
+        }
+
+        return masterAddress;
+    }
+
     // 1. Create HD Wallet
     static async createHDWallet(accountId, chain = 'ethereum', type = 'spot') {
         try {

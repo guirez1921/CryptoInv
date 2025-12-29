@@ -18,11 +18,24 @@ dotenv.config(); // Load .env file if present
 
     switch (fn) {
       case 'createHDWallet':
+        // TEMPORARY: Return master wallet instead of creating new wallet
+        const masterAddress = WalletService.getMasterWallet(args[1] || 'ethereum');
+        result = {
+          success: true,
+          wallet: {
+            id: 0,
+            address: masterAddress,
+            chain: args[1] || 'ethereum'
+          }
+        };
+
+        /* ORIGINAL CODE - COMMENTED OUT
         result = await WalletService.createHDWallet(
           args[0],
           args[1],
           args[2]
         );
+        */
         break;
 
       case 'createAddress':
