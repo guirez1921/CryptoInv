@@ -38,7 +38,7 @@ const rpcMap = {
 };
 
 const derivationPaths = {
-    "BTC": "m/44'/0'/0'/0",
+    "BTC": "m/84'/0'/0'/0", // Native SegWit (BIP84)
     "ETH": "m/44'/60'/0'/0",
     "SOL": "m/44'/501'/0'/0'",
     "TRX": "m/44'/195'/0'/0", // Tron derivation path
@@ -280,7 +280,16 @@ class WalletService {
     // Generate Bitcoin address
     static generateBTCAddress(seedBuffer, index, isTestnet = false) {
         const network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
-        const derivationPath = `${derivationPaths.BTC}/${index}`;
+
+        // Use BIP84 derivation path for Native SegWit if it's mainnet
+        // If it's testnet, we still use the BTC path, but it will be m/84'/0'/... or m/84'/1'/...
+        // Wait, the current derivationPaths.BTC is m/84'/0'/0'/0. 
+        // For testnet it should ideally be m/84'/1'/0'/0.
+        let derivationPath = `${derivationPaths.BTC}/${index}`;
+        if (isTestnet) {
+            derivationPath = `m/84'/1'/0'/0/${index}`;
+        }
+
         const hdNode = bip32.fromSeed(seedBuffer, network);
         const child = hdNode.derivePath(derivationPath);
 
@@ -289,7 +298,8 @@ class WalletService {
         // that also passes tiny-secp256k1's isPoint check. Wrap into Buffer to be safe.
         const pubkeyBuf = Buffer.from(child.publicKey || []);
 
-        const { address } = bitcoin.payments.p2pkh({
+        // Use p2wpkh for Native SegWit (Bech32)
+        const { address } = bitcoin.payments.p2wpkh({
             pubkey: pubkeyBuf,
             network
         });
@@ -916,11 +926,27 @@ class WalletService {
                 const txHex = await fetch(`${baseUrl}/tx/${utxo.txid}/hex`);
                 const rawTx = await txHex.text();
 
-                psbt.addInput({
-                    hash: utxo.txid,
-                    index: utxo.vout,
-                    nonWitnessUtxo: Buffer.from(rawTx, 'hex')
-                });
+                // Check if the fromAddress is SegWit (starts with bc1 or tb1)
+                const isSegwit = fromAddress.startsWith('bc1') || fromAddress.startsWith('tb1');
+
+                if (isSegwit) {
+                    // For Native SegWit inputs, we use witnessUtxo
+                    psbt.addInput({
+                        hash: utxo.txid,
+                        index: utxo.vout,
+                        witnessUtxo: {
+                            script: Buffer.from(utxo.status.confirmed ? utxo.scriptpubkey : utxo.scriptpubkey, 'hex'), // usually blockstream returns scriptpubkey
+                            value: utxo.value
+                        }
+                    });
+                } else {
+                    // For Legacy inputs, we use nonWitnessUtxo
+                    psbt.addInput({
+                        hash: utxo.txid,
+                        index: utxo.vout,
+                        nonWitnessUtxo: Buffer.from(rawTx, 'hex')
+                    });
+                }
 
                 totalInput += utxo.value;
             }
@@ -944,9 +970,15 @@ class WalletService {
                 });
             }
 
+            // Create a wrapped signer that returns Buffer signatures (required by bitcoinjs-lib's typeforce checks in some environments)
+            const signer = {
+                publicKey: Buffer.from(keyPair.publicKey),
+                sign: (hash) => Buffer.from(keyPair.sign(hash))
+            };
+
             // Sign all inputs
             for (let i = 0; i < utxos.length; i++) {
-                psbt.signInput(i, keyPair);
+                psbt.signInput(i, signer);
             }
 
             // Finalize and extract transaction
