@@ -28,20 +28,19 @@ class UserAsset extends Model
         return $this->belongsTo(Asset::class);
     }
 
-    public function handleDeposit(Deposit $deposit)
+    public static function handleDepositStatic(Deposit $deposit)
     {
-        $user   = $deposit->account->user;   // or $deposit->account if you switched
+        $user   = $deposit->user;
         $asset  = $deposit->asset;
-        $amount = $deposit->amount;
+        $amount = $deposit->amount; // This is now the actual crypto amount
 
         // Create or update the user_asset row
-        $userAsset = UserAsset::updateOrCreate(
+        $userAsset = self::updateOrCreate(
             [
                 'user_id'  => $user->id,
                 'asset_id' => $asset->id,
             ],
             [
-                // If new, start with this amount
                 'available_balance' => DB::raw("available_balance + {$amount}"),
                 'total_deposited'   => DB::raw("total_deposited + {$amount}"),
             ]

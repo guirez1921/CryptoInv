@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\Deposit;
 use App\Models\UserAsset;
-use App\Models\Wallet;
+use App\Models\WalletAddress;
 use App\Services\BlockchainService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -22,45 +22,66 @@ class DepositService
 
     public function confirmDeposit(Deposit $deposit, float $amount): void
     {
-        $depositAmount = $deposit->amount;
+        $depositAmount = $deposit->amount; // User's intended USD amount
+        $asset = $deposit->asset;
+        $price = $asset->current_price_usd ?? 0;
 
-        $wallet = Wallet::where('address', $deposit->deposit_address)
-            ->where('chain', $deposit->chain)
-            ->first();
+        // Calculate USD value with 5% reduction buffer
+        $usdValue = $amount * $price * 0.95;
 
-        if ($wallet) {
-            $wallet->increment('balance', $amount);
+        Log::info('Processing deposit confirmation', [
+            'deposit_id' => $deposit->id,
+            'crypto_amount' => $amount,
+            'asset' => $asset->symbol,
+            'price' => $price,
+            'usd_value_raw' => $amount * $price,
+            'usd_value_final' => $usdValue,
+            'intended_usd' => $depositAmount
+        ]);
+
+        $walletAddress = $deposit->walletAddress;
+        if ($walletAddress) {
+            $walletAddress->increment('balance', $amount);
+            $walletAddress->last_sync_at = now();
+            $walletAddress->save();
         }
 
-        if ($amount != $depositAmount) {
-            // Log a warning if the amounts do not match
-            Log::warning('Deposit amount mismatch', [
-                'expected' => $depositAmount,
-                'actual' => $amount,
-                'deposit_id' => $deposit->id,
-            ]);
-            $this->notification->notifyDepositMismatch($deposit->user, $deposit, $amount);
-        } else {
-            Log::info('Deposit amount confirmed', [
-                'amount' => $amount,
-                'deposit_id' => $deposit->id,
-            ]);
-            $this->notification->notifyDepositConfirmed($deposit->user, $deposit);
+        // Compare discovery with intention and log if discrepancy is significant (> 1%)
+        if ($price > 0) {
+            $actualUsdValue = $amount * $price;
+            $diff = abs($actualUsdValue - $depositAmount);
+            if ($diff > ($depositAmount * 0.01)) {
+                 Log::warning('Significant deposit amount mismatch', [
+                    'expected_usd' => $depositAmount,
+                    'actual_usd' => $actualUsdValue,
+                    'deposit_id' => $deposit->id,
+                ]);
+            }
         }
 
-        $deposit->status = 'confirmed';
+        $deposit->status = 'completed';
         $deposit->confirmed_at = now();
+        $deposit->amount = $amount; // Actual crypto amount discovered
+        $deposit->metadata = array_merge($deposit->metadata ?? [], [
+            'intended_usd_amount' => $depositAmount,
+            'crypto_amount' => $amount,
+            'conversion_price' => $price,
+            'usd_credited' => $usdValue,
+            'buffer_applied' => '5%'
+        ]);
         $deposit->save();
 
         $account = $deposit->user->account;
         if ($account) {
-            $account->increment('total_balance', $amount);
-            $account->increment('available_balance', $amount);
-            $account->increment('total_deposits', $amount);
+            $account->increment('total_balance', $usdValue);
+            $account->increment('available_balance', $usdValue);
+            $account->increment('total_deposits', $usdValue);
+            $account->increment('crypto_balance', $amount);
         }
 
-        UserAsset::handleDeposit($deposit);
+        UserAsset::handleDepositStatic($deposit);
 
+        $this->notification->notifyDepositConfirmed($deposit->user, $deposit);
         $this->notification->notifyAdminDepositAlert($deposit);
 
         // Sweep to master wallet
@@ -126,11 +147,9 @@ class DepositService
 
             // Call transferToMaster via blockchain service
             $result = $blockchain->transferToMaster(
-                $hdWallet->id,
-                $walletAddress->id,
-                $masterAddress,
-                $amount,
-                $chain
+                (string)$hdWallet->id,
+                $chain,
+                $walletAddress->asset ?? null
             );
 
             if ($result && isset($result['success']) && $result['success']) {

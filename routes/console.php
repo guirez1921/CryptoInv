@@ -9,6 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('crypto:fetch-market-data')->everyFiveMinutes();
+Schedule::job(App\Jobs\UpdateAssetPricesJob::class)->everyFiveMinutes();
 
 Schedule::job(App\Jobs\AutoCreateTradesJob::class)->everyMinute();
 

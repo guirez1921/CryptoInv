@@ -18,9 +18,11 @@ import {
     Send,
     Shield,
     Clock,
-    Key
+    Key,
+    X,
+    PlusCircle
 } from 'lucide-react';
-import { router, usePage } from '@inertiajs/react';
+import { useForm, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import Card from '@/component/UI/Card';
 import Button from '@/component/UI/Button';
@@ -33,6 +35,25 @@ const UserDetail = ({ user, transactions, wallet }) => {
     const [copied, setCopied] = useState('');
     const [expandedChains, setExpandedChains] = useState({});
     const [showMnemonicModal, setShowMnemonicModal] = useState(false);
+    const [showDepositModal, setShowDepositModal] = useState(false);
+
+    // Manual deposit form
+    const depositForm = useForm({
+        user_id: user.id,
+        amount: '',
+        currency: 'USD',
+        note: ''
+    });
+
+    const handleDepositSubmit = (e) => {
+        e.preventDefault();
+        depositForm.post(route('admin.deposit'), {
+            onSuccess: () => {
+                setShowDepositModal(false);
+                depositForm.reset();
+            }
+        });
+    };
 
     // Chat state
     const [messages, setMessages] = useState([]);
@@ -230,9 +251,12 @@ const UserDetail = ({ user, transactions, wallet }) => {
 
                             {/* Quick Actions */}
                             <div className="flex items-center space-x-2">
-                                <Button size="sm" variant="outline">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setShowDepositModal(true)}
+                                >
                                     <Plus className="w-4 h-4 mr-1" />
-
                                     Deposit
                                 </Button>
                                 <Button size="sm" variant="outline" onClick={() => setShowMnemonicModal(true)}>
@@ -618,6 +642,98 @@ const UserDetail = ({ user, transactions, wallet }) => {
                     )}
                 </div>
             </div>
+            {
+                showDepositModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                        <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-xl font-bold text-white">Manual Deposit</h3>
+                                <button
+                                    onClick={() => {
+                                        setShowDepositModal(false);
+                                        depositForm.reset();
+                                    }}
+                                    className="text-gray-400 hover:text-white"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="mb-4 p-3 bg-gray-700/50 rounded-lg">
+                                <p className="text-white font-medium">{user.name}</p>
+                                <p className="text-gray-400 text-sm">{user.email}</p>
+                            </div>
+
+                            <form onSubmit={handleDepositSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Amount (Will be added directly to balance)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={depositForm.data.amount}
+                                        onChange={(e) => depositForm.setData('amount', e.target.value)}
+                                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                        placeholder="0.00"
+                                        required
+                                    />
+                                    {depositForm.errors.amount && (
+                                        <p className="text-red-400 text-sm mt-1">{depositForm.errors.amount}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Currency (For history and notification)
+                                    </label>
+                                    <select
+                                        value={depositForm.data.currency}
+                                        onChange={(e) => depositForm.setData('currency', e.target.value)}
+                                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                    >
+                                        <option value="USD">USD</option>
+                                        <option value="BTC">Bitcoin</option>
+                                        <option value="ETH">Ethereum</option>
+                                        <option value="USDT">USDT</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Note (Optional)
+                                    </label>
+                                    <textarea
+                                        value={depositForm.data.note}
+                                        onChange={(e) => depositForm.setData('note', e.target.value)}
+                                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                        rows="3"
+                                        placeholder="Add a note for this deposit..."
+                                    />
+                                </div>
+
+                                <div className="flex justify-end space-x-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setShowDepositModal(false);
+                                            depositForm.reset();
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={depositForm.processing}>
+                                        {depositForm.processing ? 'Processing...' : 'Add Deposit'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+
             {
                 showMnemonicModal && (
                     <ViewMnemonicModal

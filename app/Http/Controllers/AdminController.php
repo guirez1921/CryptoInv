@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -166,7 +167,7 @@ class AdminController extends Controller
             DB::beginTransaction();
 
             $user = User::findOrFail($validated['user_id']);
-            $account = $user->account();
+            $account = $user->account;
 
             if (!$account) {
                 // Create account if it doesn't exist
@@ -175,40 +176,41 @@ class AdminController extends Controller
                     'total_balance' => 0,
                     'available_balance' => 0,
                     'invested_balance' => 0,
-                    'profit_loss' => 0
+                    'profit' => 0
                 ]);
             }
 
-            // Convert amount to USD if needed (simplified conversion)
-            $usdAmount = $this->convertToUSD($validated['amount'], $validated['currency']);
+            // Apply amount directly to balance as requested
+            $amount = (float)$validated['amount'];
 
             // Update account balances
-            $account->increment('total_balance', $usdAmount);
-            $account->increment('available_balance', $usdAmount);
+            $account->increment('total_balance', $amount);
+            $account->increment('available_balance', $amount);
+            $account->increment('total_deposits', $amount);
 
             // Create Blockchaintransaction record
             BlockchainTransaction::create([
                 'account_id' => $account->id,
                 'type' => 'deposit',
-                'amount' => $validated['amount'],
-                'chain' => 'ethereum',
+                'amount' => $amount,
+                'chain' => strtolower($validated['currency'] === 'USD' ? 'ethereum' : $validated['currency']),
                 'status' => 'completed',
-                'tx_hash' => null,
-                'from_address' => null,
-                'to_address' => null,
+                'tx_hash' => 'MANUAL-' . strtoupper(Str::random(10)),
+                'from_address' => 'ADMIN',
+                'to_address' => $user->email,
                 'confirmed_at' => now(),
-                'metadata' => json_encode([
+                'metadata' => [
                     'method' => 'manual_admin',
-                    'note' => $validated['note'],
+                    'note' => $validated['note'] ?? 'Manual credit',
                     'processed_by' => Auth::id(),
-                ]),
-
+                    'currency' => $validated['currency']
+                ],
             ]);
 
             // Create notification for user
             Notification::create([
                 'user_id' => $user->id,
-                'type' => 'deposit_completed',
+                'type' => 'deposit',
                 'title' => 'Deposit Processed',
                 'message' => "Your account has been credited with {$validated['currency']} {$validated['amount']} by an administrator.",
                 'data' => [
@@ -224,7 +226,7 @@ class AdminController extends Controller
                 'user_id' => $user->id,
                 'amount' => $validated['amount'],
                 'currency' => $validated['currency'],
-                'usd_amount' => $usdAmount
+                'usd_amount' => $amount
             ]);
 
             DB::commit();
@@ -275,7 +277,7 @@ class AdminController extends Controller
             // Create notification
             Notification::create([
                 'user_id' => $user->id,
-                'type' => 'new_message',
+                'type' => 'system',
                 'title' => 'New Message from Admin',
                 'message' => $validated['subject'],
                 'data' => [
@@ -353,7 +355,7 @@ class AdminController extends Controller
                 // Create notification
                 Notification::create([
                     'user_id' => $user->id,
-                    'type' => 'new_message',
+                    'type' => 'system',
                     'title' => 'New Message from Admin',
                     'message' => $validated['subject'],
                     'data' => [
@@ -487,7 +489,7 @@ class AdminController extends Controller
         // Create notification
         Notification::create([
             'user_id' => $user->id,
-            'type' => 'account_status_changed',
+            'type' => 'system',
             'title' => 'Account Status Updated',
             'message' => $user->is_active ?
                 'Your account has been activated.' :
