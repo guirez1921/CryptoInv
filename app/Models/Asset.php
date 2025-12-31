@@ -9,10 +9,17 @@ class Asset extends Model
 {
     protected $fillable = [
         'name',
+        'abv_name',
         'symbol',
         'network',
+        'icon',
         'contract_address',
+        'asset_type',
         'decimals',
+        'current_price_usd',
+        'is_active',
+        'supports_deposits',
+        'supports_withdrawals',
     ];
 
     public function deposits(): HasMany

@@ -148,23 +148,16 @@ class PaymentController extends Controller
             return response()->json(['error' => 'Failed to create address', 'detail' => $e->getMessage()], 500);
         }
 
-        $address = $result['address'];
-        // if (is_array($result) && !empty($result['address'])) {
-        //     // Persist address into WalletAddress or HdWallet addresses relationship
-        //     $hdWallet->addresses()->create([
-        //         'address' => $address,
-        //         'is_used' => false,
-        //         'address_index' => $hdWallet->address_index + 1,
-        //     ]);
-        //     // bump address index
-        // }
+        $address = $result['address'] ?? null;
+        if (!$address) {
+            Log::error('[PaymentController@getOrCreateDepositAddress] address creation failed', ['hdWalletId' => $hdWallet->id ?? null, 'result' => $result]);
+            return response()->json(['error' => 'Address creation failed', 'result' => $result], 500);
+        }
+
         $hdWallet->incrementAddressIndex(1);
 
         Log::info('[PaymentController@getOrCreateDepositAddress] address persisted', ['hdWalletId' => $hdWallet->id, 'address' => $address]);
         return response()->json(['success' => true, 'depositAddress' => $address]);
-
-        Log::error('[PaymentController@getOrCreateDepositAddress] address creation failed', ['hdWalletId' => $hdWallet->id ?? null, 'result' => $result]);
-        return response()->json(['error' => 'Address creation failed', 'result' => $result], 500);
     }
 
     /**
@@ -287,32 +280,32 @@ class PaymentController extends Controller
         
         // Get closed trades (profit/loss)
         $trades = $user->trades()
-            ->where('status', 'closed')
+            ->where('trades.status', 'closed')
             ->selectRaw('
-                id as reference_id,
-                CASE WHEN profit_loss >= 0 THEN "profit" ELSE "loss" END as type,
-                profit_loss as amount,
-                COALESCE(closed_at, updated_at) as date,
+                trades.id as reference_id,
+                CASE WHEN trades.profit_loss >= 0 THEN "profit" ELSE "loss" END as type,
+                trades.profit_loss as amount,
+                COALESCE(trades.closed_at, trades.updated_at) as date,
                 "trade" as source
             ');
 
         // Get deposits
         $deposits = $user->deposits()
             ->selectRaw('
-                id as reference_id,
+                deposits.id as reference_id,
                 "deposit" as type,
-                amount,
-                created_at as date,
+                deposits.amount,
+                deposits.created_at as date,
                 "deposit" as source
             ');
 
         // Get withdrawals
         $withdrawals = $user->withdrawals()
             ->selectRaw('
-                id as reference_id,
+                withdrawals.id as reference_id,
                 "withdrawal" as type,
-                amount,
-                created_at as date,
+                withdrawals.amount,
+                withdrawals.created_at as date,
                 "withdrawal" as source
             ');
 

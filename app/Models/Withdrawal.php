@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Withdrawal extends Model
 {
     protected $fillable = [
-        'user_id', 'asset_id', 'blockchain_transaction_id',
-        'withdrawal_address', 'amount', 'network_fee', 'platform_fee',
+        'user_id', 'account_id', 'asset_id', 'hd_wallet_id', 'blockchain_transaction_id',
+        'chain', 'withdrawal_address', 'amount', 'network_fee', 'platform_fee',
         'final_amount', 'status', 'transaction_hash',
         'confirmations', 'required_confirmations',
         'sent_at', 'confirmed_at', 'approved_by_admin_id',
@@ -28,9 +28,9 @@ class Withdrawal extends Model
         return $this->belongsTo(Account::class);
     }
 
-    public function user()
+    public function user(): BelongsTo
     {
-        return $this->account->user();
+        return $this->belongsTo(User::class);
     }
 
     public function asset(): BelongsTo

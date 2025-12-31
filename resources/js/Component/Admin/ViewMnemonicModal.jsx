@@ -21,30 +21,22 @@ const ViewMnemonicModal = ({ user, onClose }) => {
         setMnemonicError('');
 
         try {
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-            const response = await fetch(route('admin.users.mnemonic', user.id), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrf,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ password: adminPassword })
+            const response = await window.axios.post(route('admin.users.mnemonic', user.id), {
+                password: adminPassword
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                setMnemonicError(data.error || 'Failed to retrieve mnemonic');
-                return;
-            }
+            const data = response.data;
 
             setMnemonic(data.mnemonic);
             setAdminPassword('');
             setShowMnemonic(true);
         } catch (error) {
             console.error('Error:', error);
-            setMnemonicError('Failed to retrieve mnemonic. Please try again.');
+            if (error.response && error.response.status === 403) {
+                setMnemonicError(error.response.data.error || 'Invalid password.');
+            } else {
+                setMnemonicError('Failed to retrieve mnemonic. Please try again.');
+            }
         } finally {
             setIsLoading(false);
         }

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('user_preferences', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->enum('kyc_status', ['not_verified', 'pending', 'verified', 'rejected'])->default('not_verified');
             $table->boolean('two_factor_enabled')->default(false);
 

@@ -18,17 +18,11 @@ const WalletAddressesModal = ({ user, onClose }) => {
         setLoading(true);
         setError('');
         try {
-            const response = await fetch(route('admin.users.walletAddresses', user.id));
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to load addresses');
-            }
-
-            setAddresses(data.addresses || []);
+            const response = await window.axios.get(route('admin.users.walletAddresses', user.id));
+            setAddresses(response.data.addresses || []);
         } catch (err) {
             console.error('Error loading addresses:', err);
-            setError(err.message);
+            setError(err.response?.data?.error || err.message);
         } finally {
             setLoading(false);
         }
@@ -41,33 +35,18 @@ const WalletAddressesModal = ({ user, onClose }) => {
 
         setTransferring(address.id);
         try {
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-            const response = await fetch(route('admin.users.transferToMaster'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrf,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                    user_id: user.id,
-                    address_id: address.id,
-                    chain: address.chain,
-                    asset: address.asset
-                })
+            const response = await window.axios.post(route('admin.users.transferToMaster'), {
+                user_id: user.id,
+                address_id: address.id,
+                chain: address.chain,
+                asset: address.asset
             });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Transfer failed');
-            }
 
             alert('Transfer initiated successfully!');
             loadWalletAddresses(); // Reload to see updated balances
         } catch (err) {
             console.error('Transfer error:', err);
-            alert(`Transfer failed: ${err.message}`);
+            alert(`Transfer failed: ${err.response?.data?.error || err.message}`);
         } finally {
             setTransferring(null);
         }

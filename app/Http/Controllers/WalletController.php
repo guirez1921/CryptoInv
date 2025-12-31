@@ -204,11 +204,19 @@ class WalletController extends Controller
                 $request->asset
             );
 
+            if (!$result || !isset($result['address'])) {
+                Log::error("[WalletController] Address generation failed to return address", ['result' => $result]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to generate address. Result was invalid.',
+                ], 500);
+            }
+
             Log::info("[WalletController] New address generated for user {$user->id}, chain {$request->chain}");
 
             return response()->json([
                 'success' => true,
-                'address' => $result['address'] ?? null,
+                'address' => $result['address'],
                 'chain' => $request->chain,
                 'asset' => $request->asset,
             ]);

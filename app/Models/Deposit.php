@@ -9,6 +9,7 @@ class Deposit extends Model
 {
     protected $fillable = [
         'user_id',
+        'account_id',
         'asset_id',
         'blockchain_transaction_id',
         'deposit_address',
@@ -19,7 +20,7 @@ class Deposit extends Model
         'confirmations',
         'required_confirmations',
         'confirmed_at',
-        'notes',
+        'description',
         'metadata',
         'chain',
         'wallet_address_id',
@@ -35,9 +36,9 @@ class Deposit extends Model
         return $this->belongsTo(Account::class);
     }
 
-    public function user()
+    public function user(): BelongsTo
     {
-        return $this->account->user();
+        return $this->belongsTo(User::class);
     }
 
     public function asset(): BelongsTo

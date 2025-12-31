@@ -113,27 +113,9 @@ const FloatingChat = ({ auth, adminUser = null, initialMessages = [] }) => {
     setMessage('');
 
     try {
-      // Send via fetch to avoid navigation and stay on the same page
-      const url = route('chat.send');
-      const tokenMeta = document.querySelector('meta[name="csrf-token"]');
-      const csrf = tokenMeta ? tokenMeta.getAttribute('content') : '';
-
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': csrf,
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ message: tempMessage.content }),
-        credentials: 'same-origin'
+      const response = await window.axios.post(route('chat.send'), {
+        message: tempMessage.content
       });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw err;
-      }
 
       // On success remove temp message and rely on Echo to append the real one
       setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
@@ -167,9 +149,8 @@ const FloatingChat = ({ auth, adminUser = null, initialMessages = [] }) => {
 
   const loadChatHistory = async () => {
     try {
-      const response = await fetch(route('chat.history'));
-      const data = await response.json();
-      setMessages(data.messages || []);
+      const response = await window.axios.get(route('chat.history'));
+      setMessages(response.data.messages || []);
     } catch (error) {
       console.error('Failed to load chat history:', error);
     }
@@ -297,8 +278,8 @@ const FloatingChat = ({ auth, adminUser = null, initialMessages = [] }) => {
                           className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                         >
                           <div className={`max-w-xs px-3 py-2 rounded-lg ${isOwn
-                              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
-                              : 'bg-gray-700 text-gray-100'
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white'
+                            : 'bg-gray-700 text-gray-100'
                             } ${msg.sending ? 'opacity-60' : ''}`}>
                             {!isOwn && (
                               <div className="flex items-center space-x-2 mb-1">

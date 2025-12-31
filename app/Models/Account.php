@@ -9,9 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Account extends Model
 {
     protected $fillable = [
-        'user_id', 'admin_id', 'total_balance', 'total_balance_change',
-        'inv_balance', 'ava_balance', 'profit',
-        'total_deposits', 'total_withdrawals',
+        'user_id', 'admin_id', 'total_balance', 'available_balance', 'invested_balance',
+        'profit', 'total_deposits', 'total_withdrawals', 'min_withdrawal', 'crypto_balance',
         'unrealized_pnl', 'realized_pnl',
         'last_activity_at', 'is_active', 'account_type',
         'demo_balance',

@@ -68,7 +68,7 @@ class DashboardController extends Controller
 
         // Get recent transactions
         $deposits = $user->deposits()
-            ->select('blockchain_transactions.id', 'blockchain_transactions.amount', 'blockchain_transactions.status', 'blockchain_transactions.created_at')
+            ->select('deposits.id', 'deposits.amount', 'deposits.status', 'deposits.created_at')
             ->take(8)
             ->get()
             ->map(function ($deposit) {
@@ -83,7 +83,7 @@ class DashboardController extends Controller
             });
 
         $withdrawals = $user->withdrawals()
-            ->select('blockchain_transactions.id', 'blockchain_transactions.amount', 'blockchain_transactions.status', 'blockchain_transactions.created_at')
+            ->select('withdrawals.id', 'withdrawals.amount', 'withdrawals.status', 'withdrawals.created_at')
             ->take(8)
             ->get()
             ->map(function ($withdrawal) {

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('deposits', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('account_id')->constrained()->onDelete('cascade');
             $table->foreignId('asset_id')->constrained()->onDelete('cascade');
             $table->foreignId('blockchain_transaction_id')->nullable()->constrained()->onDelete('set null');
@@ -25,7 +26,7 @@ return new class extends Migration
             $table->integer('confirmations')->default(0);
             $table->integer('required_confirmations')->default(6);
             $table->timestamp('confirmed_at')->nullable();
-            $table->text('notes')->nullable();
+            $table->text('description')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
 

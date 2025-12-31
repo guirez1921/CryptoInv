@@ -64,7 +64,17 @@ class BlockchainService
         }
 
         $decoded = json_decode($output, true);
-        return json_last_error() === JSON_ERROR_NONE ? $decoded : $output;
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            Log::error('[BlockchainService] runNode returned invalid JSON', [
+                'function' => $fn,
+                'output' => $output,
+                'json_error' => json_last_error_msg()
+            ]);
+            return null;
+        }
+
+        return $decoded;
     }
 
     // --- Wrapper methods ---

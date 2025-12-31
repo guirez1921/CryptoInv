@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('withdrawals', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('account_id')->constrained('users');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('account_id')->constrained()->onDelete('cascade');
             $table->foreignId('asset_id')->constrained('assets');
             $table->foreignId('hd_wallet_id')->nullable()->constrained()->onDelete('set null');
             $table->string('chain')->default('ethereum');

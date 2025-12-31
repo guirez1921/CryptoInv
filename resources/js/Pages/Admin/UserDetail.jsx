@@ -143,18 +143,9 @@ const UserDetail = ({ user, transactions, wallet }) => {
         setNewMessage('');
 
         try {
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-            const response = await fetch(route('admin.chat.send', user.id), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrf,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ message: tempMsg.message })
+            const response = await window.axios.post(route('admin.chat.send', user.id), {
+                message: tempMsg.message
             });
-
-            if (!response.ok) throw new Error('Failed');
 
             setMessages(prev => prev.filter(msg => msg.id !== tempMsg.id));
         } catch (error) {

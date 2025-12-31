@@ -48,11 +48,8 @@ const PaymentIndex = () => {
     let mounted = true;
     const fetchMin = async () => {
       try {
-        const res = await fetch(route('settings.getMinWithdrawal'));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        console.log(data);
-        const val = data.min_withdrawal ?? data.minWithdrawal ?? data.min ?? 25000;
+        const response = await window.axios.get(route('settings.getMinWithdrawal'));
+        const val = response.data.min_withdrawal ?? response.data.minWithdrawal ?? response.data.min ?? 25000;
         if (mounted) setMinimumWithdrawal(Number(val));
       } catch (err) {
         console.error('Error fetching minimum withdrawal:', err);
@@ -108,36 +105,30 @@ const PaymentIndex = () => {
   const fetchSupportedChains = async () => {
     setLoading(true);
     try {
-      const response = await fetch(route('payments.supportedChains'), {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await window.axios.get(route('payments.supportedChains'));
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log(data);
-        const chains = data.chains || [];
-        setSupportedChains(chains);
+      const data = response.data;
+      console.log(data);
+      const chains = data.chains || [];
+      setSupportedChains(chains);
+      try {
+        // persist the fetched list and selection so subsequent page loads are instant
+        localStorage.setItem('supportedChains', JSON.stringify(chains));
+      } catch (err) {
+        console.error('Error writing supportedChains to localStorage', err);
+      }
+      if (chains && chains.length > 0) {
+        // prefer an existing selectedChain in localStorage if present
         try {
-          // persist the fetched list and selection so subsequent page loads are instant
-          localStorage.setItem('supportedChains', JSON.stringify(chains));
+          const savedSelected = localStorage.getItem('selectedChain');
+          const selectedKey = savedSelected || chains[0].key;
+          setSelectedChain(selectedKey);
+          setWithdrawChain(selectedKey);
+          localStorage.setItem('selectedChain', selectedKey);
         } catch (err) {
-          console.error('Error writing supportedChains to localStorage', err);
-        }
-        if (chains && chains.length > 0) {
-          // prefer an existing selectedChain in localStorage if present
-          try {
-            const savedSelected = localStorage.getItem('selectedChain');
-            const selectedKey = savedSelected || chains[0].key;
-            setSelectedChain(selectedKey);
-            setWithdrawChain(selectedKey);
-            localStorage.setItem('selectedChain', selectedKey);
-          } catch (err) {
-            console.error('Error handling selectedChain localStorage', err);
-            setSelectedChain(chains[0].key);
-            setWithdrawChain(chains[0].key);
-          }
+          console.error('Error handling selectedChain localStorage', err);
+          setSelectedChain(chains[0].key);
+          setWithdrawChain(chains[0].key);
         }
       }
     } catch (error) {
@@ -189,20 +180,13 @@ const PaymentIndex = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(route('payments.getDepositAddress', { chain: selectedChain }), {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await window.axios.get(route('payments.getDepositAddress', { chain: selectedChain }));
 
-      if (response.ok) {
-        console.log(response);
-        const data = await response.json();
-        if (data.success) {
-          setDepositAddress(data.depositAddress);
-          setAddressGenerated(true);
-          console.log(data);
-        }
+      const data = response.data;
+      if (data.success) {
+        setDepositAddress(data.depositAddress);
+        setAddressGenerated(true);
+        console.log(data);
       }
     } catch (error) {
       console.error('Error generating deposit address:', error);
@@ -237,10 +221,9 @@ const PaymentIndex = () => {
           // start monitoring the deposit address if we have one
           try {
             if (depositAddress) {
-              await fetch(route('payments.startDepositMonitoring'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ address: depositAddress, chain: selectedChain })
+              await window.axios.post(route('payments.startDepositMonitoring'), {
+                address: depositAddress,
+                chain: selectedChain
               });
             }
           } catch (err) {
@@ -568,7 +551,7 @@ const PaymentIndex = () => {
                     {/* Critical Warning */}
                     <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg">
                       <div className="flex items-start space-x-2">
-                        <TriangleAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
                           <p className="text-red-400 font-semibold text-sm">⚠️ CRITICAL WARNING</p>
                           <p className="text-red-300 text-xs">

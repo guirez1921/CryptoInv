@@ -25,11 +25,8 @@ const Dashboard = ({
 
     const fetchMinWithdrawal = async () => {
       try {
-        const res = await fetch(route('settings.getMinWithdrawal'));
-        if (!res.ok) {
-          throw new Error(`Failed to fetch min withdrawal: ${res.status}`);
-        }
-        const data = await res.json();
+        const response = await window.axios.get(route('settings.getMinWithdrawal'));
+        const data = response.data;
         console.log(data);
         // support different possible keys returned by the endpoint
         const val = data.min_withdrawal ?? data.minWithdrawal ?? data.min ?? 0;
@@ -442,7 +439,7 @@ const Dashboard = ({
                       <div key={idx} className="flex items-center justify-between py-2">
                         <div className="flex items-center space-x-3">
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center ${tx.status_badge === 'deposit' ? 'bg-blue-500/20' :
-                              tx.status_badge === 'withdrawal' ? 'bg-orange-500/20' : 'bg-green-500/20'
+                            tx.status_badge === 'withdrawal' ? 'bg-orange-500/20' : 'bg-green-500/20'
                             }`}>
                             {tx.status_badge === 'deposit' && <ArrowDownRight className="w-3 h-3 text-blue-400" />}
                             {tx.status_badge === 'withdrawal' && <ArrowUpRight className="w-3 h-3 text-orange-400" />}
@@ -493,8 +490,8 @@ const Dashboard = ({
                         key={option.value}
                         onClick={() => setSelectedMinWithdrawal(option.value)}
                         className={`p-4 rounded-lg border-2 transition-all duration-200 ${selectedMinWithdrawal === option.value
-                            ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
-                            : 'border-gray-600 bg-gray-700/50 text-gray-300 hover:border-gray-500'
+                          ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
+                          : 'border-gray-600 bg-gray-700/50 text-gray-300 hover:border-gray-500'
                           }`}
                         disabled={isUpdating}
                       >

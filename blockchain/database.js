@@ -168,7 +168,7 @@ class HDWalletDB {
              SUM(CAST(wa.balance AS DECIMAL(20,8))) as total_balance
       FROM hd_wallets hw
       LEFT JOIN wallet_addresses wa ON hw.id = wa.hd_wallet_id
-      WHERE hw.account_id = ? AND hw.chain = ?
+      WHERE hw.account_id = ? AND wa.chain = ?
     `;
 
     const params = [accountId, chain];
@@ -219,8 +219,8 @@ class HDWalletDB {
       FROM hd_wallets hw
       LEFT JOIN wallet_addresses wa ON hw.id = wa.hd_wallet_id
       WHERE hw.account_id = ? AND hw.is_active = 1
-      GROUP BY hw.chain, hw.type
-      ORDER BY hw.chain, hw.type
+      GROUP BY wa.chain, hw.type
+      ORDER BY wa.chain, hw.type
     `;
 
     const [rows] = await pool.execute(query, [accountId]);

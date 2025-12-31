@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('asset')->nullable(); // e.g., ETH, BTC
             $table->enum('purpose', ['deposit', 'change', 'trading', 'cold_storage'])->default('deposit');
             $table->decimal('balance', 36, 18)->default(0);
+            $table->decimal('token_balance', 36, 18)->default(0);
             $table->decimal('gas_balance', 36, 18)->default(0);
             $table->boolean('is_used')->default(false);
             $table->timestamp('used_at')->nullable();

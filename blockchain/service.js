@@ -1145,27 +1145,6 @@ class WalletService {
         };
     }
 
-    // Get mnemonic for HD wallet (admin only - for recovery)
-    // static async getMnemonic(hdWalletId) {
-    //     try {
-    //         const hdWallet = await HDWalletDB.getHDWallet(hdWalletId);
-    //         if (!hdWallet) {
-    //             throw new Error('HD Wallet not found');
-    //         }
-
-    //         // Decrypt the  mnemonic
-    //         const mnemonic = HDWalletDB.decryptMnemonic(hdWallet.encrypted_seed);
-
-    //         return {
-    //             success: true,
-    //             mnemonic: mnemonic,
-    //             walletId: hdWallet.id
-    //         };
-    //     } catch (error) {
-    //         throw new Error(`Failed to retrieve mnemonic: ${error.message}`);
-    //     }
-    // }
-
     /**
      * Return a list of supported chains and basic metadata for each
      * @returns {Promise<Array<Object>>}

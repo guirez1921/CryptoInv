@@ -49,23 +49,16 @@ const WalletPage = () => {
         setMnemonicError('');
 
         try {
-            const response = await fetch(route('wallet.exportMnemonic'), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                },
-                body: JSON.stringify({ password }),
+            const response = await window.axios.post(route('wallet.exportMnemonic'), {
+                password
             });
 
-            const data = await response.json();
-
-            if (data.success) {
-                setMnemonic(data.mnemonic);
+            if (response.data.success) {
+                setMnemonic(response.data.mnemonic);
                 setPassword('');
                 setShowMnemonic(true);
             } else {
-                setMnemonicError(data.message || 'Failed to export mnemonic');
+                setMnemonicError(response.data.message || 'Failed to export mnemonic');
             }
         } catch (error) {
             console.error('Error exporting mnemonic:', error);
@@ -138,8 +131,8 @@ const WalletPage = () => {
                                     <p className="text-2xl font-bold text-white capitalize">{wallet?.status || 'Unknown'}</p>
                                 </div>
                                 <div className={`flex items-center justify-center w-12 h-12 rounded-lg ${wallet?.status === 'active' ? 'bg-gradient-to-r from-green-500 to-emerald-600' :
-                                        wallet?.status === 'locked' ? 'bg-gradient-to-r from-red-500 to-orange-600' :
-                                            'bg-gradient-to-r from-yellow-500 to-orange-600'
+                                    wallet?.status === 'locked' ? 'bg-gradient-to-r from-red-500 to-orange-600' :
+                                        'bg-gradient-to-r from-yellow-500 to-orange-600'
                                     }`}>
                                     {wallet?.is_locked ? <Lock className="w-6 h-6 text-white" /> : <Unlock className="w-6 h-6 text-white" />}
                                 </div>
