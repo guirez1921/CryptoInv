@@ -16,6 +16,21 @@ class Account extends Model
         'demo_balance',
     ];
 
+    protected $casts = [
+        'total_balance' => 'decimal:2',
+        'available_balance' => 'decimal:2',
+        'invested_balance' => 'decimal:2',
+        'profit' => 'decimal:2',
+        'total_deposits' => 'decimal:2',
+        'total_withdrawals' => 'decimal:2',
+        'min_withdrawal' => 'decimal:2',
+        'unrealized_pnl' => 'decimal:2',
+        'realized_pnl' => 'decimal:2',
+        'demo_balance' => 'decimal:2',
+        'last_activity_at' => 'datetime',
+        'is_active' => 'boolean',
+    ];
+
     public function user():BelongsTo
     {
         return $this->belongsTo(User::class);

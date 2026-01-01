@@ -3,15 +3,17 @@ import { Link, router, usePage } from '@inertiajs/react';
 import { Bell, User, LogOut, Settings, Menu, Wallet } from 'lucide-react';
 import { route } from 'ziggy-js';
 
-const AuthenticatedHeader = ({ user = null, userBalance = null, notificationCount = 0, sidebarOpen, setSidebarOpen }) => {
+const AuthenticatedHeader = ({ user = null, account = null, notificationCount = 0, sidebarOpen, setSidebarOpen, setIsBalanceModalOpen }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
+  const totalBalance = account?.total_balance ?? 0;
+
   // Format balance for display
-  const formattedBalance = userBalance ? userBalance.toLocaleString('en-US', { 
-    style: 'currency', 
+  const formattedBalance = totalBalance ? totalBalance.toLocaleString('en-US', {
+    style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2 
+    maximumFractionDigits: 2
   }) : '$0.00';
 
   // Display simplified balance for mobile based on amount
@@ -21,8 +23,8 @@ const AuthenticatedHeader = ({ user = null, userBalance = null, notificationCoun
     if (balance >= 1000) return `$${(balance / 1000).toFixed(1)}K`;
     return balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   };
-  
-  const simplifiedBalance = getSimplifiedBalance(userBalance);
+
+  const simplifiedBalance = getSimplifiedBalance(totalBalance);
 
   const handleLogout = () => {
     router.post(route('logout'));
@@ -43,41 +45,39 @@ const AuthenticatedHeader = ({ user = null, userBalance = null, notificationCoun
           {/* Right side - Balance, Notifications, User Menu */}
           <div className="flex items-center space-x-4">
             {/* Balance */}
-            <Link
-              href={route('assets.index')}
+            <button
+              onClick={() => setIsBalanceModalOpen(true)}
               className="group items-center hidden px-4 py-2 space-x-2 transition-all duration-200 rounded-lg sm:flex bg-gray-800/50 hover:bg-gray-800/70 hover:scale-105"
-              title={userBalance !== null ? `Click to view portfolio details\nTotal Balance: ${formattedBalance}` : 'Loading balance...'}
+              title={account !== null ? `Click to view balance analysis\nTotal Balance: ${formattedBalance}` : 'Loading balance...'}
             >
               <Wallet className="w-5 h-5 text-cyan-400 flex-shrink-0 group-hover:text-cyan-300 transition-colors" />
               <div className="text-right">
                 <p className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">Total Balance</p>
-                <p className={`text-sm font-semibold transition-colors ${
-                  userBalance === null ? 'text-gray-400' : 
-                  userBalance > 0 ? 'text-white group-hover:text-cyan-100' : 'text-gray-300'
-                }`}>
-                  {userBalance === null ? (
+                <p className={`text-sm font-semibold transition-colors ${account === null ? 'text-gray-400' :
+                  totalBalance > 0 ? 'text-white group-hover:text-cyan-100' : 'text-gray-300'
+                  }`}>
+                  {account === null ? (
                     <span className="animate-pulse">Loading...</span>
                   ) : formattedBalance}
                 </p>
               </div>
-            </Link>
+            </button>
 
             {/* Mobile Balance */}
-            <Link
-              href={route('assets.index')}
+            <button
+              onClick={() => setIsBalanceModalOpen(true)}
               className="flex items-center px-3 py-2 transition-colors rounded-lg sm:hidden bg-gray-800/50 hover:bg-gray-800/70"
             >
-              <span className={`text-sm font-semibold ${
-                userBalance === null ? 'text-gray-400' : 
-                userBalance > 0 ? 'text-white' : 'text-gray-300'
-              }`}>
-                {userBalance === null ? (
+              <span className={`text-sm font-semibold ${account === null ? 'text-gray-400' :
+                totalBalance > 0 ? 'text-white' : 'text-gray-300'
+                }`}>
+                {account === null ? (
                   <span className="animate-pulse">Loading...</span>
                 ) : (
-                  userBalance && userBalance > 1000 ? simplifiedBalance : formattedBalance
+                  totalBalance && totalBalance > 1000 ? simplifiedBalance : formattedBalance
                 )}
               </span>
-            </Link>
+            </button>
 
             {/* Notifications */}
             <Link
@@ -137,6 +137,7 @@ const AuthenticatedHeader = ({ user = null, userBalance = null, notificationCoun
           </div>
         </div>
       </div>
+
     </header>
   );
 };

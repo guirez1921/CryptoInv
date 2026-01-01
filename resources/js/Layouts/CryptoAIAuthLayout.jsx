@@ -3,25 +3,28 @@ import { Head, usePage } from '@inertiajs/react';
 import AuthenticatedHeader from '@/component/Layout/AuthenticatedHeader';
 import Sidebar from '@/component/Layout/Sidebar';
 import FloatingChat from '@/Component/Layout/Chat';
+import BalanceAnalysisModal from '@/Component/UI/BalanceAnalysisModal';
 
 export default function CryptoAIAuthLayout({ children, title = 'CryptoAI Dashboard' }) {
     const { auth } = usePage().props;
     const user = auth?.user;
-    const userBalance = user?.account?.balance || 0;
+    const account = auth?.account || null;
     const notificationCount = auth?.notificationCount || 0;
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
 
     return (
         <>
             <Head title={title} />
             <div className="flex flex-col h-screen bg-gray-900">
                 {/* Header */}
-                <AuthenticatedHeader 
-                    user={user} 
-                    userBalance={userBalance} 
-                    notificationCount={notificationCount} 
-                    sidebarOpen={sidebarOpen} 
-                    setSidebarOpen={setSidebarOpen} 
+                <AuthenticatedHeader
+                    user={user}
+                    account={account}
+                    notificationCount={notificationCount}
+                    sidebarOpen={sidebarOpen}
+                    setSidebarOpen={setSidebarOpen}
+                    setIsBalanceModalOpen={setIsBalanceModalOpen}
                 />
 
                 <div className="relative flex flex-1 overflow-hidden">
@@ -44,6 +47,13 @@ export default function CryptoAIAuthLayout({ children, title = 'CryptoAI Dashboa
                         <FloatingChat auth={auth} />
                     </main>
                 </div>
+
+                {/* Balance Analysis Modal - Root level of layout */}
+                <BalanceAnalysisModal
+                    account={account}
+                    isOpen={isBalanceModalOpen}
+                    onClose={() => setIsBalanceModalOpen(false)}
+                />
             </div>
         </>
     );

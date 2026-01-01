@@ -39,10 +39,16 @@ class HandleInertiaRequests extends Middleware
         return array_merge(parent::share($request), [
         'auth' => [
             'user' => Auth::user(),
-            'balance' => Auth::user()?->balance,
+            'balance' => number_format(Auth::user()?->balance ?? 0, 2, '.', ''),
             'account' => Auth::user()?->account ? [
-                'available_balance' => Auth::user()->account->available_balance ?? 0,
-                'demo_balance' => Auth::user()->account->demo_balance ?? 0,
+                'total_balance' => number_format(Auth::user()->account->total_balance ?? 0, 2, '.', ''),
+                'available_balance' => number_format(Auth::user()->account->available_balance ?? 0, 2, '.', ''),
+                'invested_balance' => number_format(Auth::user()->account->invested_balance ?? 0, 2, '.', ''),
+                'demo_balance' => number_format(Auth::user()->account->demo_balance ?? 0, 2, '.', ''),
+                'profit' => number_format(Auth::user()->account->profit ?? 0, 2, '.', ''),
+                'total_deposits' => number_format(Auth::user()->account->total_deposits ?? 0, 2, '.', ''),
+                'unrealized_pnl' => number_format(Auth::user()->account->unrealized_pnl ?? 0, 2, '.', ''),
+                'realized_pnl' => number_format(Auth::user()->account->realized_pnl ?? 0, 2, '.', ''),
             ] : null,
             'notificationCount' => Auth::user()?->notifications()->where('is_read', false)->count(),
         ],

@@ -8,6 +8,10 @@ const bip39 = require('bip39');
 const { BIP32Factory } = require('bip32');
 const ecc = require('tiny-secp256k1');
 const { ECPairFactory } = require('ecpair');
+
+// Initialize ECC library for bitcoinjs-lib 6.x (required for P2TR and some P2WPKH operations)
+bitcoin.initEccLib(ecc);
+
 const bip32 = BIP32Factory(ecc);
 const ECPair = ECPairFactory(ecc);
 const HDWalletDB = require('./database');
@@ -35,13 +39,17 @@ const rpcMap = {
     tron: "https://api.trongrid.io",
     tronShasta: "https://api.shasta.trongrid.io",
     tronNile: "https://nile.trongrid.io",
+    // Ripple (XRP)
+    xrp: "https://s1.ripple.com:51234",
+    xrpTestnet: "https://s.altnet.rippletest.net:51234",
 };
 
 const derivationPaths = {
-    "BTC": "m/84'/0'/0'/0", // Native SegWit (BIP84)
+    "BTC": "m/84'/0'/0'/0", // Native SegWit (BIP84) - matches Trust Wallet
     "ETH": "m/44'/60'/0'/0",
     "SOL": "m/44'/501'/0'/0'",
     "TRX": "m/44'/195'/0'/0", // Tron derivation path
+    "XRP": "m/44'/144'/0'/0", // Ripple derivation path (BIP44)
 };
 
 // Token contract addresses
@@ -71,6 +79,7 @@ const SUPPORTED_WALLETS = {
     optimism: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
     arbitrum: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
     bsc: { type: 'EVM', coinType: 60, nativeCurrency: 'BNB', icon: '' },
+    xrp: { type: 'XRP', coinType: 144, nativeCurrency: 'XRP', icon: '' },
     linea: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
     blast: { type: 'EVM', coinType: 60, nativeCurrency: 'ETH', icon: '' },
     palm: { type: 'EVM', coinType: 60, nativeCurrency: 'PALM', icon: '' },
@@ -224,6 +233,9 @@ class WalletService {
                 case 'TRX':
                     ({ address, derivationPath } = this.generateTRXAddress(seedBuffer, index));
                     break;
+                case 'XRP':
+                    ({ address, derivationPath } = this.generateXRPAddress(seedBuffer, index));
+                    break;
                 default:
                     throw new Error(`Unknown wallet type: ${generationWalletType.type}`);
             }
@@ -277,14 +289,12 @@ class WalletService {
         }
     }
 
-    // Generate Bitcoin address
+    // Generate Bitcoin address (Pay-to-Witness-Public-Key-Hash (P2WPKH) - Native SegWit)
     static generateBTCAddress(seedBuffer, index, isTestnet = false) {
         const network = isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
 
-        // Use BIP84 derivation path for Native SegWit if it's mainnet
-        // If it's testnet, we still use the BTC path, but it will be m/84'/0'/... or m/84'/1'/...
-        // Wait, the current derivationPaths.BTC is m/84'/0'/0'/0. 
-        // For testnet it should ideally be m/84'/1'/0'/0.
+        // Use BIP84 derivation path for P2WPKH Native SegWit (starts with 'bc1q')
+        // This matches Trust Wallet's default BTC address generation
         let derivationPath = `${derivationPaths.BTC}/${index}`;
         if (isTestnet) {
             derivationPath = `m/84'/1'/0'/0/${index}`;
@@ -298,7 +308,7 @@ class WalletService {
         // that also passes tiny-secp256k1's isPoint check. Wrap into Buffer to be safe.
         const pubkeyBuf = Buffer.from(child.publicKey || []);
 
-        // Use p2wpkh for Native SegWit (Bech32)
+        // Use Pay-to-Witness-Public-Key-Hash (P2WPKH) for Native SegWit (Bech32) - starts with 'bc1q'
         const { address } = bitcoin.payments.p2wpkh({
             pubkey: pubkeyBuf,
             network
@@ -306,7 +316,8 @@ class WalletService {
 
         return {
             address,
-            derivationPath
+            derivationPath,
+            type: 'P2WPKH'
         };
     }
 
@@ -400,6 +411,64 @@ class WalletService {
         return new TronWebClass(cfg);
     }
 
+    // Generate XRP (Ripple) address
+    static generateXRPAddress(seedBuffer, index) {
+        const derivationPath = `${derivationPaths.XRP}/${index}`;
+        const hdNode = bip32.fromSeed(seedBuffer);
+        const child = hdNode.derivePath(derivationPath);
+
+        try {
+            const pkBuf = Buffer.from(child.publicKey || []);
+
+            // XRP uses secp256k1 and a custom base58 encoding
+            // We need to hash the public key and encode it
+            const sha256Hash = crypto.createHash('sha256').update(pkBuf).digest();
+            const ripemd160Hash = crypto.createHash('ripemd160').update(sha256Hash).digest();
+
+            // Add XRP account ID prefix (0x00)
+            const accountIdWithPrefix = Buffer.concat([Buffer.from([0x00]), ripemd160Hash]);
+
+            // Calculate checksum (double SHA256)
+            const checksum = crypto.createHash('sha256')
+                .update(crypto.createHash('sha256').update(accountIdWithPrefix).digest())
+                .digest()
+                .slice(0, 4);
+
+            // Combine and encode to base58
+            const addressBuffer = Buffer.concat([accountIdWithPrefix, checksum]);
+            const address = this.base58EncodeXRP(addressBuffer);
+
+            return {
+                address,
+                derivationPath
+            };
+        } catch (e) {
+            throw new Error(`Failed to generate XRP address: ${e.message}`);
+        }
+    }
+
+    // Base58 encoding for XRP (uses ripple alphabet)
+    static base58EncodeXRP(buffer) {
+        const ALPHABET = 'rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz';
+        const BASE = BigInt(58);
+
+        let num = BigInt('0x' + buffer.toString('hex'));
+        let encoded = '';
+
+        while (num > 0n) {
+            const remainder = Number(num % BASE);
+            encoded = ALPHABET[remainder] + encoded;
+            num = num / BASE;
+        }
+
+        // Handle leading zeros
+        for (let i = 0; i < buffer.length && buffer[i] === 0; i++) {
+            encoded = ALPHABET[0] + encoded;
+        }
+
+        return encoded;
+    }
+
     // 3. Check balance of wallet (supports both native currency and tokens)
     static async checkBalance(walletAddress, chain, tokenSymbol = null) {
         try {
@@ -425,6 +494,9 @@ class WalletService {
                         break;
                     case 'TRX':
                         balance = await this.getTRXBalance(walletAddress, chain);
+                        break;
+                    case 'XRP':
+                        balance = await this.getXRPBalance(walletAddress, chain);
                         break;
                 }
             }
@@ -577,6 +649,42 @@ class WalletService {
         }
     }
 
+    // Get XRP balance
+    static async getXRPBalance(address, chain) {
+        const rpcUrl = rpcMap[chain] || rpcMap['xrp'];
+
+        try {
+            const response = await fetch(rpcUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    method: 'account_info',
+                    params: [{
+                        account: address,
+                        ledger_index: 'validated'
+                    }]
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.result && data.result.account_data) {
+                // Convert drops to XRP (1 XRP = 1,000,000 drops)
+                const drops = data.result.account_data.Balance;
+                return (parseInt(drops) / 1000000).toString();
+            }
+
+            // Account not found or not activated
+            return '0';
+        } catch (error) {
+            // If account doesn't exist on XRP ledger, return 0
+            if (error.message.includes('actNotFound') || error.message.includes('Account not found')) {
+                return '0';
+            }
+            throw new Error(`Failed to get XRP balance: ${error.message}`);
+        }
+    }
+
     // 4. Transfer asset to master wallet (withdrawal simulation)
     // Enhanced transferToMaster with actual blockchain transfers - SWEEP MODE
     static async transferToMaster(fromWalletId, toMasterAddress, chain, assetId = null) {
@@ -676,6 +784,11 @@ class WalletService {
                             privateKey, fromAddress.address, toMasterAddress, amount, chain, assetId
                         ));
                         break;
+                    case 'XRP':
+                        ({ txHash, actualGasFee } = await this.executeXRPTransfer(
+                            privateKey, fromAddress.address, toMasterAddress, amount, chain
+                        ));
+                        break;
                     default:
                         throw new Error(`Unsupported wallet type: ${walletType.type}`);
                 }
@@ -751,6 +864,7 @@ class WalletService {
                 case 'BTC': balance = await this.getBTCBalance(address, chain); break;
                 case 'SOL': balance = await this.getSOLBalance(address, chain); break;
                 case 'TRX': balance = await this.getTRXBalance(address, chain); break;
+                case 'XRP': balance = await this.getXRPBalance(address, chain); break;
             }
         }
 
@@ -795,6 +909,11 @@ class WalletService {
                 }
                 case 'TRX': {
                     const fee = 1.1; // ~1.1 TRX for transfer
+                    const maxAmount = parseFloat(balance) - fee;
+                    return maxAmount > 0 ? maxAmount.toString() : '0';
+                }
+                case 'XRP': {
+                    const fee = 0.00001; // Standard XRP fee (10 drops)
                     const maxAmount = parseFloat(balance) - fee;
                     return maxAmount > 0 ? maxAmount.toString() : '0';
                 }
@@ -1120,6 +1239,41 @@ class WalletService {
         }
     }
 
+    // Execute XRP transfer (stub - requires xrpl library)
+    static async executeXRPTransfer(privateKey, fromAddress, toAddress, amount, chain) {
+        // Note: Full XRP transfer implementation requires the 'xrpl' library
+        // This is a stub function that should be implemented when xrpl is installed
+        // npm install xrpl
+
+        throw new Error('XRP transfers require the xrpl library. Please install: npm install xrpl');
+
+        /* Planned implementation:
+        const xrpl = require('xrpl');
+        const client = new xrpl.Client(rpcMap[chain]);
+        await client.connect();
+        
+        // Convert private key to wallet
+        const wallet = xrpl.Wallet.fromSeed(privateKeyToSeed(privateKey));
+        
+        // Prepare payment
+        const payment = {
+            TransactionType: 'Payment',
+            Account: fromAddress,
+            Amount: xrpl.xrpToDrops(amount),
+            Destination: toAddress
+        };
+        
+        // Submit and wait for validation
+        const response = await client.submitAndWait(payment, { wallet });
+        await client.disconnect();
+        
+        return {
+            txHash: response.result.hash,
+            actualGasFee: '0.00001' // 10 drops standard fee
+        };
+        */
+    }
+
     // Get blockchain explorer URL
     static getBlockchainExplorerUrl(chain, txHash) {
         const explorers = {
@@ -1132,7 +1286,9 @@ class WalletService {
             solana: `https://explorer.solana.com/tx/${txHash}`,
             solanaDevnet: `https://explorer.solana.com/tx/${txHash}?cluster=devnet`,
             tron: `https://tronscan.org/#/transaction/${txHash}`,
-            tronShasta: `https://shasta.tronscan.org/#/transaction/${txHash}`
+            tronShasta: `https://shasta.tronscan.org/#/transaction/${txHash}`,
+            xrp: `https://livenet.xrpl.org/transactions/${txHash}`,
+            xrpTestnet: `https://testnet.xrpl.org/transactions/${txHash}`
         };
 
         return explorers[chain] || null;
