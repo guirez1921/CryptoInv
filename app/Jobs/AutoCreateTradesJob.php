@@ -4,6 +4,9 @@ namespace App\Jobs;
 
 use App\Models\User;
 use App\Models\Trade;
+use App\Models\Account;
+use App\Models\Asset;
+use App\Models\UserAsset;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
