@@ -60,6 +60,43 @@ class Account extends Model
         return (float)$this->total_balance + $this->getCryptoTotalUsdValue();
     }
 
+    /**
+     * Calculate unrealized P&L for all active trades
+     */
+    public function calculateUnrealizedPnl(): float
+    {
+        return $this->trades()->where('status', 'active')->get()->sum(function ($trade) {
+            $currentPrice = $trade->asset ? ($trade->asset->current_price_usd ?? $trade->entry_price) : 1;
+            return ($currentPrice - $trade->entry_price) * $trade->amount;
+        });
+    }
+
+    /**
+     * Calculate realized P&L from closed trades
+     */
+    public function calculateRealizedPnl(): float
+    {
+        return $this->trades()->where('status', 'closed')->sum('profit_loss');
+    }
+
+    /**
+     * Synchronize account statistics with trade data
+     */
+    public function syncWithTrades(): void
+    {
+        $realized = $this->calculateRealizedPnl();
+        $unrealized = $this->calculateUnrealizedPnl();
+        $invested = $this->trades()->where('status', 'active')->sum('amount');
+
+        $this->update([
+            'realized_pnl' => $realized,
+            'unrealized_pnl' => $unrealized,
+            'profit' => $realized, // Usually 'profit' in this schema refers to realized gains
+            'invested_balance' => $invested,
+            'last_activity_at' => now(),
+        ]);
+    }
+
     public function deposits(): HasMany
     {
         return $this->hasMany(Deposit::class);

@@ -17,5 +17,7 @@ Schedule::job(App\Jobs\FetchCandlestickJob::class)->everyMinute();
 
 Schedule::job(App\Jobs\CloseExpiredTradesJob::class)->everyMinute();
 
+Schedule::job(App\Jobs\UpdateAccountStatisticsJob::class)->everyFiveMinutes();
+
 // Schedule::job(App\Jobs\SendDailySummaryEmailsJob::class)->dailyAt('08:00');
 

@@ -40,7 +40,7 @@ class AutoCreateTradesJob implements ShouldQueue
                     $assetBalance = (float)$userAsset->available_balance;
                     if ($assetBalance > 0) {
                         $percent = rand(5, 20) / 100;
-                        $amount = $assetBalance * $percent;
+                        $amount = round($assetBalance * $percent, 2);
                         $this->createTrade($user, $account, $userAsset->asset, $amount, $userAsset);
                     }
                 }
@@ -60,7 +60,6 @@ class AutoCreateTradesJob implements ShouldQueue
                 $durations = [30, 60, 120, 240]; // minutes
 
                 $trade = Trade::create([
-                    'user_id'    => $user->id,
                     'account_id' => $account ? $account->id : null,
                     'asset_id'   => $asset ? $asset->id : null,
                     'strategy'   => $strategies[array_rand($strategies)],

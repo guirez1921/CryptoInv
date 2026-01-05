@@ -33,9 +33,28 @@ class CloseExpiredTradesJob implements ShouldQueue
     {
         try {
             DB::transaction(function () use ($trade) {
-                // Calculate Profit/Loss (Randomly between -2% and +5%)
-                // ROI = multiplier (e.g., 0.98 to 1.05)
-                $roi = (rand(980, 1050) / 1000); 
+                // Determine Win/Loss (80% Win Rate)
+                $isWin = rand(1, 100) <= 80;
+                $strategy = $trade->strategy ?? 'balanced';
+
+                // Define P/L ranges (in percentage / 100)
+                $ranges = [
+                    'aggressive' => ['win' => [0.05, 0.15], 'loss' => [0.05, 0.15]],
+                    'balanced'   => ['win' => [0.02, 0.08], 'loss' => [0.02, 0.06]],
+                    'conservative' => ['win' => [0.005, 0.03], 'loss' => [0.005, 0.02]],
+                ];
+
+                // Fallback for unknown strategy
+                $range = $ranges[$strategy] ?? $ranges['balanced'];
+
+                if ($isWin) {
+                    $percentage = rand($range['win'][0] * 1000, $range['win'][1] * 1000) / 1000;
+                    $roi = 1 + $percentage;
+                } else {
+                    $percentage = rand($range['loss'][0] * 1000, $range['loss'][1] * 1000) / 1000;
+                    $roi = 1 - $percentage;
+                }
+
                 $profit_loss = ($trade->amount * $roi) - $trade->amount;
                 
                 $exit_price = $trade->entry_price * $roi;
@@ -60,7 +79,7 @@ class CloseExpiredTradesJob implements ShouldQueue
                     
                     if ($trade->asset_id) {
                         // Handle Crypto Asset Settlement
-                        $userAsset = UserAsset::where('user_id', $trade->user_id)
+                        $userAsset = UserAsset::where('user_id', $account->user_id)
                             ->where('asset_id', $trade->asset_id)
                             ->first();
                         
@@ -76,7 +95,7 @@ class CloseExpiredTradesJob implements ShouldQueue
                     }
                 }
 
-                Log::info("Settled trade {$trade->id} for user {$trade->user_id}. P/L: {$profit_loss}");
+                Log::info("Settled trade {$trade->id} for user " . ($trade->account->user_id ?? 'Unknown') . ". P/L: {$profit_loss}");
             });
         } catch (\Exception $e) {
             Log::error("Failed to settle trade {$trade->id}: " . $e->getMessage());

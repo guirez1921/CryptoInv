@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Trade extends Model
 {
     protected $fillable = [
-        'user_id', 'account_id', 'asset_id', 'strategy', 'amount',
+        'account_id', 'asset_id', 'strategy', 'amount',
         'entry_price', 'exit_price', 'duration_minutes', 'status', 'profit_loss',
         'opened_at', 'closed_at', 'metadata',
     ];

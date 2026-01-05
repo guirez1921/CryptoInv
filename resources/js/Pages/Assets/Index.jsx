@@ -8,12 +8,12 @@ import {
     PieChart,
     Settings,
 } from "lucide-react";
-import Card from "@/component/UI/Card";
-import Button from "@/component/UI/Button";
+import Card from "@/Component/UI/Card";
+import Button from "@/Component/UI/Button";
 import CryptoAIAuthLayout from "@/Layouts/CryptoAIAuthLayout";
 import { CartesianGrid, Line as ReChart, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, LineChart } from "recharts";
 
-export default function Assets() {
+export const Assets = () => {
     const {
         assets,
         account,
@@ -286,7 +286,7 @@ export default function Assets() {
                                                 <div className="flex items-center space-x-4">
                                                     <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
                                                         <span className="text-white font-bold">
-                                                            {trade.asset.symbol.charAt(0)}
+                                                            {trade.asset.symbol?.charAt(0) || '?'}
                                                         </span>
                                                     </div>
                                                     <div>
@@ -396,3 +396,5 @@ export default function Assets() {
         </CryptoAIAuthLayout>
     );
 }
+
+export default Assets;

@@ -22,22 +22,24 @@ class AssetController extends Controller
 
         $performance_metric_monthly = $this->calculatePerformanceMetric($trades, 30);
 
-        $active_trades = $trades->where('status', 'active')->map(function ($trade) {
-            $current_price = $trade->asset->current_price ?? 0;
+        $active_trades = $trades->where('status', 'active')
+            ->filter(fn($trade) => $trade->asset !== null)
+            ->map(function ($trade) {
+            $current_price = $trade->asset->current_price_usd ?? 0;
             $price_change = $current_price - $trade->entry_price;
             $strategy = $trade->strategy;
 
             return [
                 'id' => $trade->id,
                 'asset' => $trade->asset,
-                'amount' => $trade->amount,
+                'amount' => number_format($trade->amount, 2),
                 'entry_price' => $trade->entry_price,
                 'current_price' => $current_price,
                 'price_change' => $price_change,
                 'strategy' => $strategy,
                 'opened_at' => $trade->opened_at,
             ];
-        });
+        })->values();
 
         // Calculate risk score based on strategies
         $strategy_points = [
