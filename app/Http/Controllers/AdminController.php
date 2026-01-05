@@ -9,6 +9,8 @@ use App\Models\BlockchainTransaction;
 use App\Models\Chat;
 use App\Models\UserMessage;
 use App\Models\Notification;
+use App\Models\Asset;
+use App\Models\UserAsset;
 use App\Services\BlockchainService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -206,6 +208,26 @@ class AdminController extends Controller
                     'currency' => $validated['currency']
                 ],
             ]);
+
+            // Track crypto asset balance if not USD
+            if ($validated['currency'] !== 'USD') {
+                $asset = Asset::where('abv_name', strtolower($validated['currency']))
+                    ->orWhere('symbol', strtoupper($validated['currency']))
+                    ->first();
+
+                if ($asset) {
+                    UserAsset::updateOrCreate(
+                        [
+                            'user_id' => $user->id,
+                            'asset_id' => $asset->id,
+                        ],
+                        [
+                            'available_balance' => DB::raw("available_balance + {$amount}"),
+                            'total_deposited' => DB::raw("total_deposited + {$amount}"),
+                        ]
+                    );
+                }
+            }
 
             // Create notification for user
             Notification::create([

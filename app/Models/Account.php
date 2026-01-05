@@ -36,10 +36,29 @@ class Account extends Model
         return $this->belongsTo(User::class);
     }
 
-    // public function userAssets(): HasMany
-    // {
-    //     return $this->hasMany(UserAsset::class);
-    // }
+    public function userAssets(): HasMany
+    {
+        return $this->hasMany(UserAsset::class, 'user_id', 'user_id');
+    }
+
+    /**
+     * Calculate the total USD value of all crypto assets in the portfolio
+     */
+    public function getCryptoTotalUsdValue(): float
+    {
+        return $this->userAssets->sum(function ($userAsset) {
+            $price = $userAsset->asset->current_price_usd ?? 0;
+            return $userAsset->available_balance * $price;
+        });
+    }
+
+    /**
+     * Get the total portfolio value (Account Balance + Crypto Assets Value)
+     */
+    public function getTotalPortfolioValue(): float
+    {
+        return (float)$this->total_balance + $this->getCryptoTotalUsdValue();
+    }
 
     public function deposits(): HasMany
     {

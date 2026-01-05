@@ -21,14 +21,14 @@ dotenv.config(); // Load .env file if present
 
 const rpcMap = {
     // Ethereum and EVM chains
-    ethereum: "https://mainnet.infura.io/v3/17405663a8354f2daef2178409d0fc84",
-    sepolia: "https://sepolia.infura.io/v3/17405663a8354f2daef2178409d0fc84",
-    polygon: "https://polygon-mainnet.infura.io/v3/17405663a8354f2daef2178409d0fc84",
-    base: "https://base-mainnet.infura.io/v3/17405663a8354f2daef2178409d0fc84",
-    avalanche: "https://avalanche-mainnet.infura.io/v3/17405663a8354f2daef2178409d0fc84",
-    optimism: "https://optimism-mainnet.infura.io/v3/17405663a8354f2daef2178409d0fc84",
-    arbitrum: "https://arbitrum-mainnet.infura.io/v3/17405663a8354f2daef2178409d0fc84",
-    bsc: "https://bsc-mainnet.infura.io/v3/17405663a8354f2daef2178409d0fc84",
+    ethereum: `https://mainnet.infura.io/v3/${process.env.INFURA_ID}`,
+    sepolia: `https://sepolia.infura.io/v3/${process.env.INFURA_ID}`,
+    polygon: `https://polygon-mainnet.infura.io/v3/${process.env.INFURA_ID}`,
+    base: `https://base-mainnet.infura.io/v3/${process.env.INFURA_ID}`,
+    avalanche: `https://avalanche-mainnet.infura.io/v3/${process.env.INFURA_ID}`,
+    optimism: `https://optimism-mainnet.infura.io/v3/${process.env.INFURA_ID}`,
+    arbitrum: `https://arbitrum-mainnet.infura.io/v3/${process.env.INFURA_ID}`,
+    bsc: `https://bsc-mainnet.infura.io/v3/${process.env.INFURA_ID}`,
     // Bitcoin
     bitcoin: "https://blockstream.info/api",
     bitcoinTestnet: "https://blockstream.info/testnet/api",

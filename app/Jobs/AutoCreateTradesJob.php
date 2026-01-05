@@ -18,40 +18,75 @@ class AutoCreateTradesJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Loop through users with accounts
-        User::with('account')->chunk(100, function ($users) {
+        // Loop through users with accounts and their crypto assets
+        User::with(['account', 'userAssets.asset'])->chunk(100, function ($users) {
             foreach ($users as $user) {
+                // 1. Process USD Balance Trade
                 $account = $user->account;
-
-                if (!$account) {
-                    continue;
+                if ($account) {
+                    $available = (float)$account->available_balance;
+                    if ($available > 1.0) { // Only trade if balance > $1
+                        $percent = rand(5, 20) / 100; // 5% to 20%
+                        $amount = round($available * $percent, 2);
+                        $this->createTrade($user, $account, null, $amount);
+                    }
                 }
 
-                $available = $account->available_balance;
-
-                if ($available > 0) {
-                    DB::transaction(function () use ($user, $account, $available) {
-                        // Create a trade
-                        $trade = Trade::create([
-                            'user_id'   => $user->id,
-                            'asset_id'  => null, // or pick a default asset
-                            'strategy'  => 'balanced', // or dynamic
-                            'amount'    => $available,
-                            'entry_price' => 1, // placeholder, set real market price
-                            'duration_minutes' => 60, // example: 1 hour
-                            'status'    => 'active',
-                            'opened_at' => now(),
-                            'metadata'  => json_encode(['auto' => true]),
-                        ]);
-
-                        // Update balances
-                        $account->decrement('available_balance', $available);
-                        $account->increment('invested_balance', $available);
-
-                        Log::info("Created trade {$trade->id} for user {$user->id} with amount {$available}");
-                    });
+                // 2. Process Crypto Asset Trades
+                foreach ($user->userAssets as $userAsset) {
+                    $assetBalance = (float)$userAsset->available_balance;
+                    if ($assetBalance > 0) {
+                        $percent = rand(5, 20) / 100;
+                        $amount = $assetBalance * $percent;
+                        $this->createTrade($user, $account, $userAsset->asset, $amount, $userAsset);
+                    }
                 }
             }
         });
+    }
+
+    /**
+     * Create a trade and update corresponding balance
+     */
+    private function createTrade(User $user, ?Account $account, ?Asset $asset, float $amount, ?UserAsset $userAsset = null): void
+    {
+        try {
+            DB::transaction(function () use ($user, $account, $asset, $amount, $userAsset) {
+                $price = $asset ? ($asset->current_price_usd ?? 1) : 1;
+                $strategies = ['balanced', 'aggressive', 'conservative'];
+                $durations = [30, 60, 120, 240]; // minutes
+
+                $trade = Trade::create([
+                    'user_id'    => $user->id,
+                    'account_id' => $account ? $account->id : null,
+                    'asset_id'   => $asset ? $asset->id : null,
+                    'strategy'   => $strategies[array_rand($strategies)],
+                    'amount'     => $amount,
+                    'entry_price' => $price,
+                    'duration_minutes' => $durations[array_rand($durations)],
+                    'status'     => 'active',
+                    'opened_at'  => now(),
+                    'metadata'   => [
+                        'auto' => true,
+                        'asset_symbol' => $asset ? $asset->symbol : 'USD',
+                        'type' => $asset ? 'crypto' : 'fiat'
+                    ],
+                ]);
+
+                if ($userAsset) {
+                    // Update UserAsset balance
+                    $userAsset->decrement('available_balance', $amount);
+                    $userAsset->increment('invested_balance', $amount);
+                } elseif ($account) {
+                    // Update Account balance (USD)
+                    $account->decrement('available_balance', $amount);
+                    $account->increment('invested_balance', $amount);
+                }
+
+                Log::info("Created auto-trade {$trade->id} for user {$user->id} with amount {$amount} " . ($asset ? $asset->symbol : 'USD'));
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to create auto-trade for user {$user->id}: " . $e->getMessage());
+        }
     }
 }

@@ -11,11 +11,11 @@ Artisan::command('inspire', function () {
 Schedule::command('crypto:fetch-market-data')->everyFiveMinutes();
 Schedule::job(App\Jobs\UpdateAssetPricesJob::class)->everyFiveMinutes();
 
-Schedule::job(App\Jobs\AutoCreateTradesJob::class)->everyMinute();
+Schedule::job(App\Jobs\AutoCreateTradesJob::class)->everyTenMinutes();
 
 Schedule::job(App\Jobs\FetchCandlestickJob::class)->everyMinute();
 
-// Schedule::job(App\Jobs\CloseExpiredTradesJob::class)->everyMinute();
+Schedule::job(App\Jobs\CloseExpiredTradesJob::class)->everyMinute();
 
 // Schedule::job(App\Jobs\SendDailySummaryEmailsJob::class)->dailyAt('08:00');
 
